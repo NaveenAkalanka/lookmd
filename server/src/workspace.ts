@@ -13,6 +13,7 @@ import type {
   ListFoldersResponse,
   GetTreeResponse,
   GetFileResponse,
+  PutFileResponse,
   TreeNode,
   FolderEntry,
 } from '@lookmd/shared';
@@ -30,8 +31,21 @@ import { HttpError } from './errors.ts';
 /** Directories never descended into, even though they aren't dotfiles. */
 const SKIP_DIRS: ReadonlySet<string> = new Set(['node_modules']);
 
-function hashContent(buf: Buffer): string {
+export function hashContent(buf: Buffer): string {
   return crypto.createHash('sha256').update(buf).digest('hex');
+}
+
+/** Full validation for a file target inside a workspace (containment + type +
+ * symlink), returning the resolved absolute paths. Shared by read and write. */
+function resolveFile(base: string, root: string, relPath: string) {
+  if (relPath.trim() === '') {
+    throw new HttpError(400, 'INVALID_PATH', 'path is required');
+  }
+  const resolved = resolveInRoot({ base, root, relPath });
+  assertNoSymlinkEscape(base, resolved.rootAbs); // workspace root truly inside BASE
+  assertAllowedFile(resolved.targetAbs);
+  assertNoSymlinkEscape(resolved.rootAbs, resolved.targetAbs); // file truly inside root
+  return resolved;
 }
 
 /** Sort directories before files, then case-insensitively by name. */
@@ -155,13 +169,7 @@ export async function readFile(
   root: string,
   relPath: string,
 ): Promise<GetFileResponse> {
-  if (relPath.trim() === '') {
-    throw new HttpError(400, 'INVALID_PATH', 'path is required');
-  }
-  const { rootAbs, targetAbs } = resolveInRoot({ base, root, relPath });
-  assertNoSymlinkEscape(base, rootAbs); // workspace root truly inside BASE
-  assertAllowedFile(targetAbs);
-  assertNoSymlinkEscape(rootAbs, targetAbs); // file truly inside the root
+  const { rootAbs, targetAbs } = resolveFile(base, root, relPath);
 
   let buf: Buffer;
   try {
@@ -181,5 +189,53 @@ export async function readFile(
     path: toPosix(path.relative(rootAbs, targetAbs)),
     content: buf.toString('utf8'),
     hash: hashContent(buf),
+  };
+}
+
+/**
+ * PUT /api/file — hash-checked save of an existing file.
+ *
+ * The file must already exist (creation is POST). If its current on-disk hash
+ * differs from `baseHash` — i.e. it changed under us since the client last read
+ * it — we refuse with 409 and write nothing, so external edits (Obsidian, git)
+ * are never silently clobbered. Content is written verbatim as UTF-8, so the
+ * client controls the line endings and they are preserved.
+ */
+export async function writeFile(
+  base: string,
+  root: string,
+  relPath: string,
+  content: string,
+  baseHash: string,
+): Promise<PutFileResponse> {
+  const { rootAbs, targetAbs } = resolveFile(base, root, relPath);
+
+  let current: Buffer;
+  try {
+    current = await fsp.readFile(targetAbs);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new HttpError(404, 'NOT_FOUND', `file not found: ${relPath}`);
+    }
+    if ((err as NodeJS.ErrnoException).code === 'EISDIR') {
+      throw new HttpError(400, 'INVALID_PATH', `path is a directory: ${relPath}`);
+    }
+    throw err;
+  }
+
+  if (hashContent(current) !== baseHash) {
+    throw new HttpError(
+      409,
+      'CONFLICT',
+      'file changed on disk since it was opened; reload before saving',
+    );
+  }
+
+  const next = Buffer.from(content, 'utf8');
+  await fsp.writeFile(targetAbs, next);
+
+  return {
+    path: toPosix(path.relative(rootAbs, targetAbs)),
+    hash: hashContent(next),
   };
 }
