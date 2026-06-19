@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@lookmd/shared": "*"
+    "@lookmd/shared": "*",
+    "fastify": "^5.8.5"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
