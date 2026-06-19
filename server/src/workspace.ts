@@ -14,6 +14,9 @@ import type {
   GetTreeResponse,
   GetFileResponse,
   PutFileResponse,
+  CreateFileResponse,
+  DeleteFileResponse,
+  MoveResponse,
   TreeNode,
   FolderEntry,
 } from '@lookmd/shared';
@@ -237,5 +240,96 @@ export async function writeFile(
   return {
     path: toPosix(path.relative(rootAbs, targetAbs)),
     hash: hashContent(next),
+  };
+}
+
+/** POST /api/file — create a new file (empty or from `content`). 409 if it
+ *  already exists. Missing parent folders within the root are created. */
+export async function createFile(
+  base: string,
+  root: string,
+  relPath: string,
+  content = '',
+): Promise<CreateFileResponse> {
+  const { rootAbs, targetAbs } = resolveFile(base, root, relPath);
+
+  await fsp.mkdir(path.dirname(targetAbs), { recursive: true });
+  const buf = Buffer.from(content, 'utf8');
+  try {
+    // 'wx' fails if the path already exists — atomic create, no clobber.
+    await fsp.writeFile(targetAbs, buf, { flag: 'wx' });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw new HttpError(409, 'ALREADY_EXISTS', `file already exists: ${relPath}`);
+    }
+    throw err;
+  }
+
+  return {
+    path: toPosix(path.relative(rootAbs, targetAbs)),
+    hash: hashContent(buf),
+  };
+}
+
+/** DELETE /api/file — remove a single file. Directories are refused. */
+export async function deleteFile(
+  base: string,
+  root: string,
+  relPath: string,
+): Promise<DeleteFileResponse> {
+  const { rootAbs, targetAbs } = resolveFile(base, root, relPath);
+
+  let stat: fs.Stats;
+  try {
+    stat = await fsp.lstat(targetAbs);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new HttpError(404, 'NOT_FOUND', `file not found: ${relPath}`);
+    }
+    throw err;
+  }
+  if (stat.isDirectory()) {
+    throw new HttpError(400, 'INVALID_PATH', `cannot delete a directory: ${relPath}`);
+  }
+
+  await fsp.unlink(targetAbs);
+  return { path: toPosix(path.relative(rootAbs, targetAbs)), deleted: true };
+}
+
+/** POST /api/move — rename/move a file within the same workspace root. 404 if
+ *  the source is missing, 409 if the destination already exists. */
+export async function moveFile(
+  base: string,
+  root: string,
+  from: string,
+  to: string,
+): Promise<MoveResponse> {
+  const src = resolveFile(base, root, from);
+  const dst = resolveFile(base, root, to);
+
+  let srcStat: fs.Stats;
+  try {
+    srcStat = await fsp.lstat(src.targetAbs);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new HttpError(404, 'NOT_FOUND', `file not found: ${from}`);
+    }
+    throw err;
+  }
+  if (srcStat.isDirectory()) {
+    throw new HttpError(400, 'INVALID_PATH', `cannot move a directory: ${from}`);
+  }
+
+  // Never silently overwrite an existing destination.
+  if (fs.existsSync(dst.targetAbs)) {
+    throw new HttpError(409, 'ALREADY_EXISTS', `destination already exists: ${to}`);
+  }
+
+  await fsp.mkdir(path.dirname(dst.targetAbs), { recursive: true });
+  await fsp.rename(src.targetAbs, dst.targetAbs);
+
+  return {
+    from: toPosix(path.relative(src.rootAbs, src.targetAbs)),
+    to: toPosix(path.relative(dst.rootAbs, dst.targetAbs)),
   };
 }

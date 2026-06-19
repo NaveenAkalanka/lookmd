@@ -6,10 +6,23 @@
 
 import Fastify, { type FastifyInstance } from 'fastify';
 
-import type { PutFileRequest } from '@lookmd/shared';
+import type {
+  PutFileRequest,
+  CreateFileRequest,
+  DeleteFileRequest,
+  MoveRequest,
+} from '@lookmd/shared';
 import type { Config } from './config.ts';
 import { toApiError, HttpError } from './errors.ts';
-import { listFolders, getTree, readFile, writeFile } from './workspace.ts';
+import {
+  listFolders,
+  getTree,
+  readFile,
+  writeFile,
+  createFile,
+  deleteFile,
+  moveFile,
+} from './workspace.ts';
 
 function requireString(value: unknown, field: string): string {
   if (typeof value !== 'string') {
@@ -48,6 +61,30 @@ export function buildApp(config: Config): FastifyInstance {
       const content = requireString(body.content, 'content');
       const baseHash = requireString(body.baseHash, 'baseHash');
       return writeFile(config.base, root, path, content, baseHash);
+    });
+
+    app.post('/api/file', async (req, reply) => {
+      const body = (req.body ?? {}) as Partial<CreateFileRequest>;
+      const root = typeof body.root === 'string' ? body.root : '';
+      const path = requireString(body.path, 'path');
+      const content = typeof body.content === 'string' ? body.content : '';
+      reply.code(201);
+      return createFile(config.base, root, path, content);
+    });
+
+    app.delete('/api/file', async (req) => {
+      const body = (req.body ?? {}) as Partial<DeleteFileRequest>;
+      const root = typeof body.root === 'string' ? body.root : '';
+      const path = requireString(body.path, 'path');
+      return deleteFile(config.base, root, path);
+    });
+
+    app.post('/api/move', async (req) => {
+      const body = (req.body ?? {}) as Partial<MoveRequest>;
+      const root = typeof body.root === 'string' ? body.root : '';
+      const from = requireString(body.from, 'from');
+      const to = requireString(body.to, 'to');
+      return moveFile(config.base, root, from, to);
     });
   }
 
