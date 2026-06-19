@@ -1,0 +1,325 @@
+/*
+ * Token foundation. Every color and font below reads from a CSS custom
+ * property — no component hardcodes a visual value. Day 3 adds more themes by
+ * supplying alternate token sets; nothing here needs to change for that.
+ * This default set is "Paper" (warm light).
+ */
+:root {
+  --background: #f6f3ee;
+  --surface: #fffdf8;
+  --text-primary: #2b2724;
+  --text-secondary: #5c554d;
+  --text-tertiary: #8a8178;
+  --accent: #9a5b34;
+  --border: #e3dccf;
+
+  --font-read: Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Consolas', monospace;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --sidebar-width: 260px;
+  --topbar-height: 44px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+/* --- Buttons ------------------------------------------------------------- */
+.btn {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-accent {
+  background: var(--accent);
+  color: var(--surface);
+  border-color: var(--accent);
+}
+
+.muted {
+  color: var(--text-tertiary);
+}
+.error {
+  color: #b3261e;
+}
+
+/* --- App layout ---------------------------------------------------------- */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--topbar-height);
+  padding: 0 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.brand {
+  font-weight: 700;
+  color: var(--accent);
+}
+.workspace-name {
+  flex: 1;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow: auto;
+  padding: 6px 0;
+}
+.sidebar-empty {
+  padding: 12px;
+}
+.content {
+  flex: 1;
+  overflow: auto;
+  min-width: 0;
+}
+.placeholder {
+  padding: 48px;
+  color: var(--text-tertiary);
+}
+
+/* --- File tree ----------------------------------------------------------- */
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-primary);
+  text-align: left;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.tree-row:hover {
+  background: var(--background);
+}
+.tree-twisty {
+  width: 12px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-dir {
+  color: var(--text-secondary);
+}
+.tree-file-active {
+  background: var(--accent);
+  color: var(--surface);
+}
+.tree-file-active:hover {
+  background: var(--accent);
+}
+
+/* --- Workspace picker ---------------------------------------------------- */
+.picker {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.picker-card {
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px 32px;
+}
+.picker-title {
+  margin: 0;
+  color: var(--accent);
+  font-size: 28px;
+}
+.picker-subtitle {
+  margin: 4px 0 20px;
+  color: var(--text-secondary);
+}
+.picker-section {
+  margin-top: 20px;
+}
+.picker-heading {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin: 0 0 8px;
+}
+.picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow: auto;
+}
+.picker-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+.picker-item:hover {
+  border-color: var(--border);
+  background: var(--background);
+}
+.picker-item-name {
+  font-size: 14px;
+}
+.picker-item-path {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.picker-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.picker-breadcrumb code {
+  flex: 1;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Read view (reading typography) ------------------------------------- */
+.read {
+  font-family: var(--font-read);
+  color: var(--text-primary);
+  line-height: 1.7;
+  font-size: 17px;
+  max-width: 72ch;
+  margin: 0 auto;
+  padding: 48px 32px 96px;
+}
+.read h1,
+.read h2,
+.read h3,
+.read h4 {
+  font-family: var(--font-ui);
+  line-height: 1.25;
+  margin: 1.6em 0 0.5em;
+}
+.read h1 {
+  font-size: 1.9em;
+}
+.read h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.2em;
+}
+.read h3 {
+  font-size: 1.2em;
+}
+.read p {
+  margin: 0 0 1em;
+}
+.read a {
+  color: var(--accent);
+}
+.read code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+.read pre {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow: auto;
+}
+.read pre code {
+  border: none;
+  background: none;
+  padding: 0;
+}
+.read blockquote {
+  margin: 0 0 1em;
+  padding: 0.2em 1em;
+  border-left: 3px solid var(--accent);
+  color: var(--text-secondary);
+}
+.read table {
+  border-collapse: collapse;
+  margin: 0 0 1em;
+}
+.read th,
+.read td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+}
+.read img {
+  max-width: 100%;
+}
