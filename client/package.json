@@ -1,0 +1,7 @@
+{
+  "name": "@lookmd/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "lookmd frontend (Vite + React + TS). Scaffolded in a later Day 1 step."
+}
