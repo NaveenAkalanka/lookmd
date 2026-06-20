@@ -114,12 +114,124 @@ body {
 }
 .content {
   flex: 1;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+}
+.view {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
 }
 .placeholder {
   padding: 48px;
   color: var(--text-tertiary);
+}
+
+/* --- File bar (name + mode toggle + save) -------------------------------- */
+.file-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--topbar-height);
+  flex-shrink: 0;
+  padding: 0 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.file-bar-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dirty-dot {
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* --- Segmented control (Read / Source / Edit) ---------------------------- */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.segmented-item {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: none;
+  border-left: 1px solid var(--border);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.segmented-item:first-child {
+  border-left: none;
+}
+.segmented-item:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+.segmented-item-active {
+  background: var(--accent);
+  color: var(--surface);
+}
+.segmented-item-active:hover {
+  color: var(--surface);
+}
+.segmented-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* --- Banners (conflict / error) ------------------------------------------ */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.banner-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.banner-warn {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--text-primary);
+}
+.banner-error {
+  background: color-mix(in srgb, #b3261e 12%, var(--surface));
+  color: #b3261e;
+}
+
+/* --- Source view (raw read-only) ----------------------------------------- */
+.source {
+  margin: 0;
+  padding: 24px 28px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- Editor (CodeMirror host) -------------------------------------------- */
+.editor {
+  height: 100%;
 }
 
 /* --- File tree ----------------------------------------------------------- */
