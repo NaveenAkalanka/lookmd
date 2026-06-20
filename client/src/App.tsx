@@ -5,7 +5,7 @@
  * header + file-tree sidebar + content pane.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type { TreeNode, GetFileResponse } from '@lookmd/shared';
 import { api, ApiRequestError } from './api';
 import {
@@ -18,7 +18,10 @@ import { WorkspacePicker } from './components/WorkspacePicker';
 import { FileTree } from './components/FileTree';
 import { ReadView } from './components/ReadView';
 import { SourceView } from './components/SourceView';
-import { Editor } from './components/Editor';
+// CodeMirror is heavy; load it only when the user actually enters Edit mode.
+const Editor = lazy(() =>
+  import('./components/Editor').then((m) => ({ default: m.Editor })),
+);
 import { ModeToggle, type ViewMode } from './components/ModeToggle';
 import { SettingsPanel } from './components/SettingsPanel';
 import {
@@ -424,7 +427,9 @@ export function App() {
             {hasFile && mode === 'read' && <ReadView content={draft} />}
             {hasFile && mode === 'source' && <SourceView content={draft} />}
             {hasFile && mode === 'edit' && (
-              <Editor value={draft} docKey={docKey} onChange={setDraft} onSave={() => void save()} />
+              <Suspense fallback={<div className="placeholder">Loading editor…</div>}>
+                <Editor value={draft} docKey={docKey} onChange={setDraft} onSave={() => void save()} />
+              </Suspense>
             )}
           </div>
         </main>
