@@ -21,11 +21,18 @@ import { SourceView } from './components/SourceView';
 import { Editor } from './components/Editor';
 import { ModeToggle, type ViewMode } from './components/ModeToggle';
 
+/** Default a bare name to `.md` so it passes the backend's text allowlist. */
+function ensureTextExt(name: string): string {
+  if (name === '') return '';
+  return /\.(md|markdown|mdown|mkd|txt|text)$/i.test(name) ? name : `${name}.md`;
+}
+
 export function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(() => getLastWorkspace());
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [treeError, setTreeError] = useState<string | null>(null);
   const [treeLoading, setTreeLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const [openPath, setOpenPath] = useState<string | null>(null);
   // `file` is the last-saved snapshot (content + hash). `draft` is the live
@@ -44,30 +51,25 @@ export function App() {
 
   const dirty = file !== null && draft !== file.content;
 
-  // Load the tree whenever the workspace changes.
-  useEffect(() => {
+  const loadTree = useCallback(async () => {
     if (!workspace) return;
-    let cancelled = false;
     setTreeLoading(true);
     setTreeError(null);
-    setTree([]);
-    api
-      .tree(workspace.root)
-      .then((res) => {
-        if (!cancelled) setTree(res.tree);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setTreeError(err instanceof ApiRequestError ? err.message : 'failed to load workspace');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setTreeLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const res = await api.tree(workspace.root);
+      setTree(res.tree);
+    } catch (err) {
+      setTreeError(err instanceof ApiRequestError ? err.message : 'failed to load workspace');
+    } finally {
+      setTreeLoading(false);
+    }
   }, [workspace]);
+
+  // (Re)load the tree whenever the workspace changes.
+  useEffect(() => {
+    setTree([]);
+    void loadTree();
+  }, [loadTree]);
 
   // Warn on tab close / reload while there are unsaved changes.
   useEffect(() => {
@@ -202,6 +204,76 @@ export function App() {
     }
   }, [workspace, openPath, draft]);
 
+  // --- Tree actions (create / rename / delete) ---------------------------
+  // The backend only operates on text files (and refuses to move/delete dirs),
+  // so the UI matches: new-file lives on folders, rename/delete on files.
+
+  const newFile = useCallback(
+    async (dir: string) => {
+      if (!workspace) return;
+      const input = window.prompt(`New file name${dir ? ` in ${dir}/` : ''}:`, 'untitled.md');
+      if (input === null) return;
+      const name = ensureTextExt(input.trim());
+      if (!name) return;
+      const path = dir ? `${dir}/${name}` : name;
+      setActionError(null);
+      try {
+        await api.create({ root: workspace.root, path });
+        await loadTree();
+        openFile(path);
+      } catch (err) {
+        setActionError(err instanceof ApiRequestError ? err.message : 'could not create file');
+      }
+    },
+    [workspace, loadTree, openFile],
+  );
+
+  const renameFile = useCallback(
+    async (path: string) => {
+      if (!workspace) return;
+      const base = path.split('/').pop() ?? path;
+      const input = window.prompt('Rename file to:', base);
+      if (input === null) return;
+      const newName = ensureTextExt(input.trim());
+      if (!newName || newName === base) return;
+      const slash = path.lastIndexOf('/');
+      const to = slash >= 0 ? `${path.slice(0, slash)}/${newName}` : newName;
+      setActionError(null);
+      try {
+        await api.move({ root: workspace.root, from: path, to });
+        if (openPath === path) {
+          setOpenPath(to);
+          setFile((f) => (f ? { ...f, path: to } : f));
+        }
+        await loadTree();
+      } catch (err) {
+        setActionError(err instanceof ApiRequestError ? err.message : 'could not rename file');
+      }
+    },
+    [workspace, openPath, loadTree],
+  );
+
+  const deleteFile = useCallback(
+    async (path: string) => {
+      if (!workspace) return;
+      if (!window.confirm(`Delete "${path}"?\n\nThis cannot be undone.`)) return;
+      setActionError(null);
+      try {
+        await api.remove({ root: workspace.root, path });
+        if (openPath === path) {
+          setOpenPath(null);
+          setFile(null);
+          setDraft('');
+          setMode('read');
+        }
+        await loadTree();
+      } catch (err) {
+        setActionError(err instanceof ApiRequestError ? err.message : 'could not delete file');
+      }
+    },
+    [workspace, openPath, loadTree],
+  );
+
   const docKey = useMemo(
     () => `${workspace?.root ?? ''}::${openPath ?? ''}#${reloadNonce}`,
     [workspace, openPath, reloadNonce],
@@ -227,10 +299,33 @@ export function App() {
 
       <div className="body">
         <aside className="sidebar">
+          <div className="sidebar-head">
+            <span className="sidebar-head-label">Files</span>
+            <button
+              className="tree-action"
+              title="New file in workspace root"
+              aria-label="New file in workspace root"
+              onClick={() => void newFile('')}
+            >
+              ＋
+            </button>
+          </div>
+          {actionError && (
+            <p className="error sidebar-empty sidebar-action-error" onClick={() => setActionError(null)}>
+              {actionError} <span className="muted">(dismiss)</span>
+            </p>
+          )}
           {treeLoading && <p className="muted sidebar-empty">Loading…</p>}
           {treeError && <p className="error sidebar-empty">{treeError}</p>}
           {!treeLoading && !treeError && (
-            <FileTree tree={tree} activePath={openPath} onOpenFile={openFile} />
+            <FileTree
+              tree={tree}
+              activePath={openPath}
+              onOpenFile={openFile}
+              onNewFile={(dir) => void newFile(dir)}
+              onRename={(path) => void renameFile(path)}
+              onDelete={(path) => void deleteFile(path)}
+            />
           )}
         </aside>
 
