@@ -79,6 +79,7 @@ export async function listFolders(
   const folders: FolderEntry[] = [];
   for (const entry of entries) {
     if (entry.name.startsWith('.')) continue;
+    if (SKIP_DIRS.has(entry.name)) continue;
     let isDir = entry.isDirectory();
     if (entry.isSymbolicLink()) {
       // Only surface a link if it resolves to a directory inside BASE.

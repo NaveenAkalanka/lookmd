@@ -80,14 +80,14 @@ describe('GET /api/folders', () => {
     assert.deepEqual(body.folders.map((f) => f.name), ['ws']);
   });
 
-  it('lists sub-directories and skips hidden ones', async () => {
+  it('lists sub-directories, skipping hidden and node_modules', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/folders?path=ws' });
     assert.equal(res.statusCode, 200);
     const body = res.json() as ListFoldersResponse;
     assert.equal(body.parent, '');
-    // .hidden skipped; node_modules and sub remain (folders, not files)
-    assert.deepEqual(body.folders.map((f) => f.name), ['node_modules', 'sub']);
-    assert.deepEqual(body.folders.map((f) => f.path), ['ws/node_modules', 'ws/sub']);
+    // .hidden and node_modules skipped; only sub remains
+    assert.deepEqual(body.folders.map((f) => f.name), ['sub']);
+    assert.deepEqual(body.folders.map((f) => f.path), ['ws/sub']);
   });
 
   it('404s for a missing folder', async () => {
