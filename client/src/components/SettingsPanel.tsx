@@ -1,0 +1,134 @@
+/**
+ * Appearance settings popover: theme picker + reading/mono font choosers.
+ * Pure UI — it reports changes upward; persistence and application live in
+ * `settings.ts`. Closes on outside click or Escape.
+ */
+
+import { useEffect, useRef, useState } from 'react';
+import {
+  THEMES,
+  READING_FONTS,
+  MONO_FONTS,
+  type ThemeId,
+  type Fonts,
+  type FontOption,
+} from '../settings';
+
+interface Props {
+  theme: ThemeId;
+  fonts: Fonts;
+  onTheme: (theme: ThemeId) => void;
+  onFonts: (fonts: Fonts) => void;
+  onClose: () => void;
+}
+
+export function SettingsPanel({ theme, fonts, onTheme, onFonts, onClose }: Props) {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="settings-panel" ref={ref} role="dialog" aria-label="Appearance">
+      <h2 className="settings-title">Appearance</h2>
+
+      <section className="settings-section">
+        <span className="settings-heading">Theme</span>
+        <div className="theme-grid">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              className={`theme-chip${theme === t.id ? ' theme-chip-active' : ''}`}
+              aria-pressed={theme === t.id}
+              onClick={() => onTheme(t.id)}
+            >
+              <span className="theme-swatch" data-theme={t.id}>
+                <span className="theme-swatch-bg" />
+                <span className="theme-swatch-accent" />
+                <span className="theme-swatch-accent2" />
+              </span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <span className="settings-heading">Fonts</span>
+        <FontPicker
+          label="Reading"
+          value={fonts.read}
+          options={READING_FONTS}
+          onChange={(read) => onFonts({ ...fonts, read })}
+        />
+        <FontPicker
+          label="Editor / mono"
+          value={fonts.mono}
+          options={MONO_FONTS}
+          onChange={(mono) => onFonts({ ...fonts, mono })}
+        />
+      </section>
+    </div>
+  );
+}
+
+const CUSTOM = '__custom__';
+
+interface FontPickerProps {
+  label: string;
+  value: string;
+  options: FontOption[];
+  onChange: (value: string) => void;
+}
+
+function FontPicker({ label, value, options, onChange }: FontPickerProps) {
+  const matched = options.some((o) => o.value === value);
+  const [custom, setCustom] = useState(!matched);
+
+  const selectValue = custom ? CUSTOM : value;
+
+  return (
+    <div className="setting-block">
+      <label className="setting-label">{label}</label>
+      <select
+        className="setting-control"
+        value={selectValue}
+        onChange={(e) => {
+          if (e.target.value === CUSTOM) {
+            setCustom(true);
+          } else {
+            setCustom(false);
+            onChange(e.target.value);
+          }
+        }}
+      >
+        {options.map((o) => (
+          <option key={o.label} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+        <option value={CUSTOM}>Custom…</option>
+      </select>
+      {custom && (
+        <input
+          className="setting-control"
+          placeholder="e.g. 'Inter', sans-serif"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+    </div>
+  );
+}

@@ -1,8 +1,14 @@
 /*
  * Token foundation. Every color and font below reads from a CSS custom
- * property — no component hardcodes a visual value. Day 3 adds more themes by
- * supplying alternate token sets; nothing here needs to change for that.
- * This default set is "Paper" (warm light).
+ * property — no component hardcodes a visual value. A theme is purely a set of
+ * values for these properties (see the [data-theme] blocks); switching one
+ * swaps data only, never markup.
+ *
+ *   --accent    primary action color (brand, buttons, caret)
+ *   --accent-2  highlight color (links, active file, selection) — equals
+ *               --accent in every theme except Sanctum, where it is gold.
+ *
+ * The default set (no data-theme, or data-theme="paper") is "Paper" (warm light).
  */
 :root {
   --background: #f6f3ee;
@@ -11,7 +17,9 @@
   --text-secondary: #5c554d;
   --text-tertiary: #8a8178;
   --accent: #9a5b34;
+  --accent-2: var(--accent);
   --border: #e3dccf;
+  --danger: #b3261e;
 
   --font-read: Georgia, 'Times New Roman', serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Consolas', monospace;
@@ -19,6 +27,68 @@
 
   --sidebar-width: 260px;
   --topbar-height: 44px;
+
+  color-scheme: light;
+}
+
+/* The theme blocks below are scoped to any [data-theme] element (not just
+ * :root), so a swatch carrying data-theme="…" previews that theme's tokens. */
+
+/* Paper — warm light (explicit alias of the defaults above). */
+[data-theme='paper'] {
+  --background: #f6f3ee;
+  --surface: #fffdf8;
+  --text-primary: #2b2724;
+  --text-secondary: #5c554d;
+  --text-tertiary: #8a8178;
+  --accent: #9a5b34;
+  --accent-2: var(--accent);
+  --border: #e3dccf;
+  --danger: #b3261e;
+  color-scheme: light;
+}
+
+/* Daylight — cool / crisp light. */
+[data-theme='daylight'] {
+  --background: #eef2f6;
+  --surface: #ffffff;
+  --text-primary: #14202e;
+  --text-secondary: #45576b;
+  --text-tertiary: #8295a8;
+  --accent: #2563eb;
+  --accent-2: var(--accent);
+  --border: #d7e0ea;
+  --danger: #dc2626;
+  color-scheme: light;
+}
+
+/* Slate — neutral dark (default dark). */
+[data-theme='slate'] {
+  --background: #1d1d21;
+  --surface: #26262c;
+  --text-primary: #e7e7ec;
+  --text-secondary: #a9a9b6;
+  --text-tertiary: #71717f;
+  --accent: #6ea8fe;
+  --accent-2: var(--accent);
+  --border: #36363f;
+  --danger: #f87171;
+  color-scheme: dark;
+}
+
+/* Sanctum — gothic / 40K dark: bone text on near-black, crimson accent, gold
+ * highlights on links and the active file. */
+[data-theme='sanctum'] {
+  --background: #0c0a0a;
+  --surface: #161111;
+  --text-primary: #e9e2d2;
+  --text-secondary: #b4a98f;
+  --text-tertiary: #7e735b;
+  --accent: #9a1f23;
+  --accent-2: #c9a227;
+  --border: #2b211f;
+  --danger: #e2575c;
+  color-scheme: dark;
 }
 
 * {
@@ -62,12 +132,17 @@ body {
   color: var(--surface);
   border-color: var(--accent);
 }
+.icon-btn {
+  padding: 5px 9px;
+  font-size: 14px;
+  line-height: 1;
+}
 
 .muted {
   color: var(--text-tertiary);
 }
 .error {
-  color: #b3261e;
+  color: var(--danger);
 }
 
 /* --- App layout ---------------------------------------------------------- */
@@ -171,7 +246,7 @@ body {
   white-space: nowrap;
 }
 .dirty-dot {
-  color: var(--accent);
+  color: var(--accent-2);
   font-size: 12px;
   line-height: 1;
 }
@@ -200,7 +275,7 @@ body {
   color: var(--text-primary);
 }
 .segmented-item-active {
-  background: var(--accent);
+  background: var(--accent-2);
   color: var(--surface);
 }
 .segmented-item-active:hover {
@@ -231,8 +306,8 @@ body {
   color: var(--text-primary);
 }
 .banner-error {
-  background: color-mix(in srgb, #b3261e 12%, var(--surface));
-  color: #b3261e;
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger);
 }
 
 /* --- Source view (raw read-only) ----------------------------------------- */
@@ -250,6 +325,124 @@ body {
 /* --- Editor (CodeMirror host) -------------------------------------------- */
 .editor {
   height: 100%;
+}
+
+/* --- Appearance settings ------------------------------------------------- */
+.picker-shell {
+  position: relative;
+  height: 100%;
+}
+.settings-corner {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+}
+.settings-anchor {
+  position: relative;
+  display: inline-flex;
+}
+.settings-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  width: 280px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+.settings-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.settings-section {
+  margin-top: 14px;
+}
+.settings-section:first-of-type {
+  margin-top: 0;
+}
+.settings-heading {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+.theme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.theme-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.theme-chip:hover {
+  border-color: var(--accent);
+}
+.theme-chip-active {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+}
+.theme-swatch {
+  display: inline-flex;
+  width: 34px;
+  height: 22px;
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--background);
+  flex-shrink: 0;
+}
+.theme-swatch-bg {
+  flex: 1;
+  background: var(--surface);
+}
+.theme-swatch-accent {
+  flex: 1;
+  background: var(--accent);
+}
+.theme-swatch-accent2 {
+  flex: 1;
+  background: var(--accent-2);
+}
+.setting-block {
+  margin-bottom: 10px;
+}
+.setting-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.setting-control {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+}
+.setting-control:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 /* --- File tree ----------------------------------------------------------- */
@@ -308,7 +501,7 @@ body {
   color: var(--text-primary);
 }
 .tree-action-danger:hover {
-  color: #b3261e;
+  color: var(--danger);
 }
 .tree-twisty {
   width: 12px;
@@ -325,7 +518,7 @@ body {
 }
 .tree-file-active,
 .tree-row-wrap:hover .tree-row.tree-file-active {
-  background: var(--accent);
+  background: var(--accent-2);
   color: var(--surface);
 }
 
@@ -446,7 +639,7 @@ body {
   margin: 0 0 1em;
 }
 .read a {
-  color: var(--accent);
+  color: var(--accent-2);
 }
 .read code {
   font-family: var(--font-mono);

@@ -20,6 +20,15 @@ import { ReadView } from './components/ReadView';
 import { SourceView } from './components/SourceView';
 import { Editor } from './components/Editor';
 import { ModeToggle, type ViewMode } from './components/ModeToggle';
+import { SettingsPanel } from './components/SettingsPanel';
+import {
+  getTheme,
+  getFonts,
+  setTheme as persistTheme,
+  setFonts as persistFonts,
+  type ThemeId,
+  type Fonts,
+} from './settings';
 
 /** Default a bare name to `.md` so it passes the backend's text allowlist. */
 function ensureTextExt(name: string): string {
@@ -48,6 +57,20 @@ export function App() {
   const [conflict, setConflict] = useState(false);
   // Bumped on a reload so the editor re-seeds its document from fresh content.
   const [reloadNonce, setReloadNonce] = useState(0);
+
+  // Appearance (already applied to the DOM at bootstrap; mirror it in state).
+  const [theme, setTheme] = useState<ThemeId>(() => getTheme());
+  const [fonts, setFonts] = useState<Fonts>(() => getFonts());
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const changeTheme = useCallback((t: ThemeId) => {
+    setTheme(t);
+    persistTheme(t);
+  }, []);
+  const changeFonts = useCallback((f: Fonts) => {
+    setFonts(f);
+    persistFonts(f);
+  }, []);
 
   const dirty = file !== null && draft !== file.content;
 
@@ -279,8 +302,36 @@ export function App() {
     [workspace, openPath, reloadNonce],
   );
 
+  const settingsControl = (
+    <span className="settings-anchor">
+      <button
+        className="btn icon-btn"
+        title="Appearance"
+        aria-label="Appearance settings"
+        aria-expanded={settingsOpen}
+        onClick={() => setSettingsOpen((o) => !o)}
+      >
+        ⚙
+      </button>
+      {settingsOpen && (
+        <SettingsPanel
+          theme={theme}
+          fonts={fonts}
+          onTheme={changeTheme}
+          onFonts={changeFonts}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+    </span>
+  );
+
   if (!workspace) {
-    return <WorkspacePicker onOpen={(ws) => switchWorkspace(ws)} />;
+    return (
+      <div className="picker-shell">
+        <div className="settings-corner">{settingsControl}</div>
+        <WorkspacePicker onOpen={(ws) => switchWorkspace(ws)} />
+      </div>
+    );
   }
 
   const hasFile = openPath !== null && file !== null && !fileLoading && !fileError;
@@ -295,6 +346,7 @@ export function App() {
         <button className="btn" onClick={() => switchWorkspace(null)}>
           Change workspace
         </button>
+        {settingsControl}
       </header>
 
       <div className="body">
