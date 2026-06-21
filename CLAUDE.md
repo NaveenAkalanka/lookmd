@@ -16,7 +16,10 @@ Project / CLI / package name: `lookmd`. Domain: `look.md`.
 - Markdown rendering: client-side (`markdown-it` or `react-markdown`). The backend never renders.
 - Backend: Node + TypeScript (Fastify preferred, Express acceptable)
 - Shared API request/response types in one module, imported by both ends
-- Browser persistence: `localStorage` only — no IndexedDB, no cookies, no telemetry
+- Browser persistence: `localStorage` only — no cookies, no telemetry. **One
+  deliberate exception:** the File System Access directory-handle store uses
+  IndexedDB (handles aren't JSON-serializable), so a granted local folder
+  survives reload. Nothing else may use IndexedDB.
 - No Docker for MVP. Run via npm scripts on localhost.
 
 ## Architecture
@@ -29,6 +32,23 @@ root-scoped file API. All Markdown rendering happens in the client.
 - The active workspace root travels with each file request; the backend
   re-validates it on every call.
 - Frontend ↔ backend over a small REST API.
+
+### File sources (client-side adapter)
+
+The client addresses files through a `FileSource` interface (`client/src/sources`):
+`tree / file / save / create / remove / move`, bound to one workspace. Two
+implementations exist behind it, so the UI never knows which is active:
+
+- **`rest`** — the Node backend above. Local-first, and the Tailscale edit build.
+- **`fsa`** — the browser File System Access API. All file I/O runs client-side
+  against a directory handle the user grants, so a statically-hosted build can
+  edit folders on the *viewer's own machine* with no server in the loop.
+  Chromium-only; the UI hides it elsewhere. It mirrors the REST semantics
+  exactly (allowlist, skip rules, ordering, the sha256/409 save check).
+
+A remote server can never reach a viewer's local disk — that's a browser
+boundary, not a lookmd one. The `fsa` source is the only way to edit local
+files from a hosted build.
 
 ### API contract
 
@@ -58,6 +78,10 @@ Not "later." These go into the first file-touching commit.
 - **File-type allowlist**: operate only on `.md` / plain-text files; reject the rest.
 - **Never trust the client.** Frontend confirm dialogs are UX only — the backend
   re-validates every path on every call.
+- **FSA source boundary**: for the File System Access source there is no server
+  to trust or distrust — the browser's own folder-permission grant *is* the
+  sandbox, and segment lookups can't escape the chosen directory. It still
+  enforces the same extension allowlist client-side.
 - **Deployment split (later, not MVP)**: a public build is VIEW-ONLY (write/create/
   delete endpoints don't exist in it); the full edit build is gated behind Tailscale.
   For local-first MVP, build the full edit-capable version, but structure the code
@@ -109,7 +133,9 @@ sets the font properties. Switching either swaps data only — components never 
 
 - Docker / packaging
 - WebSocket / live file-watching (manual refresh is fine)
-- Full-filesystem browser (stick to the base-dir-scoped workspace picker)
+- Server-side full-filesystem browser (the *server* picker stays base-scoped).
+  Note: opening a local folder client-side via the File System Access source is
+  now supported — that's the browser's native picker, not a server endpoint.
 - Per-workspace settings files
 - Auth beyond the future Tailscale gating
 - Live split preview while editing (stretch — only if Day 3 has room)

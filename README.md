@@ -9,6 +9,11 @@ deployable later.
 
 - **Workspace picker** — browse folders under a base directory and open one as a
   workspace. Recent and last-used workspaces are remembered per browser.
+- **Open a local folder (no server)** — on Chromium browsers (Chrome, Edge,
+  Brave, Opera) you can open a folder on *your own machine* directly via the
+  File System Access API. This works even when lookmd is hosted elsewhere,
+  because the reads/writes happen in the browser — the server never sees those
+  files. See [Opening a local folder](#opening-a-local-folder).
 - **File tree** sidebar with create, rename, and delete (each behind a confirm).
 - **Three modes per file** — Read (rendered Markdown), Source (raw, read-only),
   and Edit (CodeMirror 6) — switched by one segmented toggle.
@@ -76,6 +81,27 @@ request it:
 
 Paths travel over the wire as POSIX-relative strings and are translated to
 native paths on the server, so Windows and POSIX hosts behave the same.
+
+## Opening a local folder
+
+The client talks to files through a `FileSource` interface with two backends, so
+the editor behaves identically either way:
+
+- **Server (REST)** — the Node backend above. Use this when you run lookmd on the
+  machine that holds your notes (local-first, or reached over a private tunnel
+  like Tailscale).
+- **Local folder (File System Access)** — on Chromium browsers, **Open a local
+  folder…** in the picker opens a folder on your own device. All reads and writes
+  happen in the browser against a handle you grant; the server is not involved
+  and never sees the files. The granted handle is remembered (in IndexedDB) so
+  you don't re-pick it on every reload.
+
+Why this matters for deployment: **a remote server can never reach files on your
+laptop** — that's a browser security boundary, not a lookmd limitation. So to
+edit *local* files from a build hosted elsewhere, use the local-folder mode. To
+edit files that live *on the server*, use the REST mode. The File System Access
+mode requires a secure context (HTTPS, or `localhost`) and is unavailable on
+Firefox and Safari, which don't implement the API.
 
 ## Project layout
 
