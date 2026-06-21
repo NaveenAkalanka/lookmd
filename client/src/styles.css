@@ -400,6 +400,97 @@ body {
   height: 100%;
 }
 
+/* --- Syntax highlighting (highlight.js classes) -------------------------- *
+ * Shared by rendered code blocks (Read) and the raw-source view (Source).
+ * highlight.js only attaches semantic classes; all color comes from the same
+ * --syntax-* tokens the editor uses, so every mode and theme stays in sync.
+ * No highlight.js theme stylesheet is imported — that would hardcode colors. */
+.hljs {
+  color: var(--text-primary);
+  background: none;
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-selector-pseudo,
+.hljs-template-tag,
+.hljs-doctag,
+.hljs-variable.language_ {
+  color: var(--syntax-keyword);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-char.escape_,
+.hljs-formula,
+.hljs-code,
+.hljs-addition {
+  color: var(--syntax-string);
+}
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--syntax-number);
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-selector-id {
+  color: var(--syntax-function);
+}
+.hljs-built_in,
+.hljs-type,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-selector-class {
+  color: var(--syntax-type);
+}
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params,
+.hljs-subst {
+  color: var(--syntax-variable);
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-selector-attr {
+  color: var(--syntax-property);
+}
+.hljs-name,
+.hljs-selector-tag {
+  color: var(--syntax-tag);
+}
+.hljs-tag,
+.hljs-punctuation {
+  color: var(--syntax-punctuation);
+}
+.hljs-operator {
+  color: var(--syntax-operator);
+}
+.hljs-meta {
+  color: var(--syntax-comment);
+}
+.hljs-section {
+  color: var(--syntax-heading);
+  font-weight: bold;
+}
+.hljs-link {
+  color: var(--syntax-link);
+}
+.hljs-deletion {
+  color: var(--danger);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: bold;
+}
+
 /* --- Appearance settings ------------------------------------------------- */
 .picker-shell {
   position: relative;
