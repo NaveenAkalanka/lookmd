@@ -16,8 +16,13 @@ import {
   addRecent,
   getLastWorkspace,
   setLastWorkspace,
+  getSession,
+  setSession,
   type Workspace,
+  type Session,
 } from './storage';
+import { getHandle } from './sources/handles';
+import { createFsaSource, hasPermission } from './sources/fsa';
 import { WorkspacePicker } from './components/WorkspacePicker';
 import { FileTree } from './components/FileTree';
 import { CommandPalette } from './components/CommandPalette';
@@ -119,6 +124,10 @@ function isExternalUrl(src: string): boolean {
   return /^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('//');
 }
 
+function isViewMode(m: string): m is ViewMode {
+  return m === 'read' || m === 'source' || m === 'edit' || m === 'split';
+}
+
 /** Default a bare name to `.md` so it passes the backend's text allowlist. */
 function ensureTextExt(name: string): string {
   if (name === '') return '';
@@ -126,16 +135,21 @@ function ensureTextExt(name: string): string {
 }
 
 export function App() {
-  const [workspace, setWorkspace] = useState<Workspace | null>(() => {
+  // Boot snapshot, read once: a REST workspace can be restored synchronously
+  // (with its saved session) so the first render already has its tabs. FSA
+  // workspaces need a permission gesture, so they're restored in an effect.
+  const [boot] = useState(() => {
     const last = getLastWorkspace();
-    // FSA workspaces need a user gesture to re-grant permission, so they can't
-    // be auto-restored — only reopen REST ones; FSA recents wait in the picker.
-    return last && last.kind === 'rest' ? last : null;
+    const ws = last && last.kind === 'rest' ? last : null;
+    const saved = ws ? getSession() : null;
+    const session = saved && ws && saved.kind === ws.kind && saved.root === ws.root ? saved : null;
+    return { ws, session };
   });
-  // The active workspace's file source, set by whoever opened it. REST sources
-  // can be rebuilt synchronously on restore; FSA ones arrive via the picker.
+
+  const [workspace, setWorkspace] = useState<Workspace | null>(boot.ws);
+  // The active workspace's file source, set by whoever opened it.
   const [source, setSource] = useState<FileSource | null>(() =>
-    workspace ? createRestSource(workspace.root) : null,
+    boot.ws ? createRestSource(boot.ws.root) : null,
   );
 
   const [tree, setTree] = useState<TreeNode[]>([]);
@@ -143,11 +157,19 @@ export function App() {
   const [treeLoading, setTreeLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Open files as tabs, plus which one is active.
-  const [tabs, setTabs] = useState<Tab[]>([]);
-  const [activePath, setActivePath] = useState<string | null>(null);
+  // Open files as tabs, plus which one is active — seeded from the saved session.
+  const [tabs, setTabs] = useState<Tab[]>(() =>
+    boot.session ? boot.session.openPaths.map(newTab) : [],
+  );
+  const [activePath, setActivePath] = useState<string | null>(() => {
+    if (!boot.session) return null;
+    const { openPaths, activePath: a } = boot.session;
+    return a && openPaths.includes(a) ? a : (openPaths[0] ?? null);
+  });
 
-  const [mode, setMode] = useState<ViewMode>('read');
+  const [mode, setMode] = useState<ViewMode>(() =>
+    boot.session && isViewMode(boot.session.mode) ? boot.session.mode : 'read',
+  );
 
   // Appearance (already applied to the DOM at bootstrap; mirror it in state).
   const [theme, setTheme] = useState<ThemeId>(() => getTheme());
@@ -168,6 +190,53 @@ export function App() {
   const updateTab = useCallback((path: string, patch: Partial<Tab>) => {
     setTabs((ts) => ts.map((t) => (t.path === path ? { ...t, ...patch } : t)));
   }, []);
+
+  // Fetch a tab's content from a given source (explicit so restore can load
+  // before the `source` state has settled).
+  const fetchInto = useCallback(
+    (src: FileSource, path: string) => {
+      updateTab(path, { loading: true, error: null });
+      src
+        .file(path)
+        .then((res) =>
+          updateTab(path, {
+            content: res.content,
+            hash: res.hash,
+            draft: res.content,
+            loading: false,
+            error: null,
+          }),
+        )
+        .catch((err: unknown) =>
+          updateTab(path, {
+            loading: false,
+            error: err instanceof ApiRequestError ? err.message : 'failed to open file',
+          }),
+        );
+    },
+    [updateTab],
+  );
+
+  const loadTab = useCallback(
+    (path: string) => {
+      if (source) fetchInto(source, path);
+    },
+    [source, fetchInto],
+  );
+
+  // Rebuild the open tabs from a saved session.
+  const restoreSession = useCallback(
+    (s: Session, src: FileSource) => {
+      if (s.openPaths.length === 0) return;
+      setTabs(s.openPaths.map(newTab));
+      setActivePath(
+        s.activePath && s.openPaths.includes(s.activePath) ? s.activePath : s.openPaths[0]!,
+      );
+      if (isViewMode(s.mode)) setMode(s.mode);
+      s.openPaths.forEach((p) => fetchInto(src, p));
+    },
+    [fetchInto],
+  );
 
   const changeTheme = useCallback((t: ThemeId) => {
     setTheme(t);
@@ -246,48 +315,66 @@ export function App() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [anyDirty]);
 
+  // Load content for the tabs seeded from the saved session (REST boot path).
+  // Runs once; FSA restore happens in the effect below.
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    if (boot.ws && boot.session && source) {
+      boot.session.openPaths.forEach((p) => fetchInto(source, p));
+    }
+    // Silent FSA restore: reopen the last local folder if permission persists.
+    if (!boot.ws) {
+      const last = getLastWorkspace();
+      if (last && last.kind === 'fsa') {
+        void (async () => {
+          const rec = await getHandle(last.root);
+          if (!rec || !(await hasPermission(rec.handle))) return;
+          const src = createFsaSource(rec.handle);
+          setWorkspace(last);
+          setSource(src);
+          const s = getSession();
+          if (s && s.kind === last.kind && s.root === last.root) restoreSession(s, src);
+        })();
+      }
+    }
+  }, [boot, source, fetchInto, restoreSession]);
+
+  // Persist the session whenever the open set, active tab, or mode changes.
+  // Keyed off the paths string so per-keystroke draft edits don't trigger writes.
+  const openPathsKey = tabs.map((t) => t.path).join('\n');
+  useEffect(() => {
+    if (!workspace) return;
+    setSession({
+      kind: workspace.kind,
+      root: workspace.root,
+      openPaths: openPathsKey ? openPathsKey.split('\n') : [],
+      activePath,
+      mode,
+    });
+  }, [workspace, openPathsKey, activePath, mode]);
+
   const switchWorkspace = useCallback(
     (ws: Workspace | null, src: FileSource | null = null) => {
       if (anyDirty && !window.confirm('You have unsaved changes. Discard them?')) return;
       setTabs([]);
       setActivePath(null);
+      setMode('read');
       if (ws && src) {
         setWorkspace(ws);
         setSource(src);
         setLastWorkspace(ws);
         addRecent(ws);
+        // Reopen the tabs from a previous session for this same workspace.
+        const s = getSession();
+        if (s && s.kind === ws.kind && s.root === ws.root) restoreSession(s, src);
       } else {
         setWorkspace(null);
         setSource(null);
       }
     },
-    [anyDirty],
-  );
-
-  // Fetch a tab's content from the source.
-  const loadTab = useCallback(
-    (path: string) => {
-      if (!source) return;
-      updateTab(path, { loading: true, error: null });
-      source
-        .file(path)
-        .then((res) =>
-          updateTab(path, {
-            content: res.content,
-            hash: res.hash,
-            draft: res.content,
-            loading: false,
-            error: null,
-          }),
-        )
-        .catch((err: unknown) =>
-          updateTab(path, {
-            loading: false,
-            error: err instanceof ApiRequestError ? err.message : 'failed to open file',
-          }),
-        );
-    },
-    [source, updateTab],
+    [anyDirty, restoreSession],
   );
 
   // Open a file: focus its tab if already open, otherwise add one and load it.

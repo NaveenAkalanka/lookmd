@@ -77,3 +77,25 @@ export function getLastWorkspace(): Workspace | null {
 export function setLastWorkspace(ws: Workspace | null): void {
   write(LAST_KEY, ws);
 }
+
+const SESSION_KEY = 'lookmd.session';
+
+/** The editing session to restore on reload: which workspace, its open tabs,
+ *  the active one, and the view mode. */
+export interface Session {
+  kind: SourceKind;
+  root: string;
+  openPaths: string[];
+  activePath: string | null;
+  mode: string;
+}
+
+export function getSession(): Session | null {
+  const s = read<Session | null>(SESSION_KEY, null);
+  if (!s || typeof s.root !== 'string' || !Array.isArray(s.openPaths)) return null;
+  return { ...s, kind: s.kind ?? 'rest' };
+}
+
+export function setSession(s: Session): void {
+  write(SESSION_KEY, s);
+}

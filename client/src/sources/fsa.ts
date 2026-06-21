@@ -49,6 +49,14 @@ export async function ensurePermission(
   return (await handle.requestPermission?.(opts)) === 'granted';
 }
 
+/** Whether read/write access is already granted — a silent query (no prompt),
+ *  so it can run on page load without a user gesture. */
+export async function hasPermission(
+  handle: FileSystemDirectoryHandle,
+): Promise<boolean> {
+  return (await handle.queryPermission?.({ mode: 'readwrite' })) === 'granted';
+}
+
 // --- shared helpers ---------------------------------------------------------
 
 /** Extensions we read or write — mirrors the server's ALLOWED_EXTENSIONS. */
