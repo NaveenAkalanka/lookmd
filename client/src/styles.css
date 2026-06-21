@@ -556,6 +556,32 @@ body {
   height: 100%;
 }
 
+/* --- Split (editor + live preview) --------------------------------------- */
+.split {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+.split-pane {
+  flex: 1 1 50%;
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+}
+.split-editor {
+  border-right: 1px solid var(--border);
+}
+.split-preview {
+  background: var(--background);
+}
+/* The reading column is centered + capped in full Read mode; in the narrower
+ * split pane let it use the available width. */
+.split-preview .read {
+  max-width: none;
+  padding: 24px 28px 64px;
+  font-size: 16px;
+}
+
 /* --- Syntax highlighting (highlight.js classes) -------------------------- *
  * Shared by rendered code blocks (Read) and the raw-source view (Source).
  * highlight.js only attaches semantic classes; all color comes from the same

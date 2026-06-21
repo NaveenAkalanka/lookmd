@@ -4,12 +4,13 @@
  * colors still come from tokens.
  */
 
-export type ViewMode = 'read' | 'source' | 'edit';
+export type ViewMode = 'read' | 'source' | 'edit' | 'split';
 
 const MODES: { id: ViewMode; label: string }[] = [
   { id: 'read', label: 'Read' },
   { id: 'source', label: 'Source' },
   { id: 'edit', label: 'Edit' },
+  { id: 'split', label: 'Split' },
 ];
 
 interface Props {

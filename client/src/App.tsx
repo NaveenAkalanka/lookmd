@@ -765,6 +765,25 @@ export function App() {
                     onSave={() => void save()}
                   />
                 )}
+                {mode === 'split' && (
+                  <div className="split">
+                    <div className="split-pane split-editor">
+                      <Editor
+                        value={activeTab.draft}
+                        docKey={docKey}
+                        onChange={setActiveDraft}
+                        onSave={() => void save()}
+                      />
+                    </div>
+                    <div className="split-pane split-preview">
+                      <ReadView
+                        content={activeTab.draft}
+                        resolveImage={resolveImage}
+                        onNavigate={navigateLink}
+                      />
+                    </div>
+                  </div>
+                )}
               </Suspense>
             )}
           </div>
