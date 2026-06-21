@@ -95,6 +95,27 @@ function flattenFiles(nodes: TreeNode[], acc: string[] = []): string[] {
   return acc;
 }
 
+function dirName(path: string): string {
+  const i = path.lastIndexOf('/');
+  return i >= 0 ? path.slice(0, i) : '';
+}
+
+/** Resolve a relative path against a directory, collapsing `.` and `..`. */
+function joinPath(dir: string, rel: string): string {
+  const out: string[] = [];
+  for (const seg of (dir ? dir.split('/') : []).concat(rel.split('/'))) {
+    if (seg === '' || seg === '.') continue;
+    if (seg === '..') out.pop();
+    else out.push(seg);
+  }
+  return out.join('/');
+}
+
+/** True for URLs that already point somewhere (scheme or protocol-relative). */
+function isExternalUrl(src: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('//');
+}
+
 /** Default a bare name to `.md` so it passes the backend's text allowlist. */
 function ensureTextExt(name: string): string {
   if (name === '') return '';
@@ -477,6 +498,17 @@ export function App() {
     ? `${workspace?.root ?? ''}::${activeTab.path}#${activeTab.reloadNonce}`
     : '';
 
+  // Resolve a Markdown image src (relative to the open file's folder) to a URL
+  // the browser can load via the active source. External URLs pass through.
+  const activeDir = activeTab ? dirName(activeTab.path) : '';
+  const resolveImage = useCallback(
+    (src: string): Promise<string> => {
+      if (!source || isExternalUrl(src)) return Promise.resolve(src);
+      return source.assetUrl(joinPath(activeDir, src));
+    },
+    [source, activeDir],
+  );
+
   const settingsButton = (
     <button
       className="btn icon-btn"
@@ -684,7 +716,9 @@ export function App() {
             )}
             {activeTab && activeTab.content !== null && !activeTab.loading && !activeTab.error && (
               <Suspense fallback={<div className="placeholder">Loading…</div>}>
-                {mode === 'read' && <ReadView content={activeTab.draft} />}
+                {mode === 'read' && (
+                  <ReadView content={activeTab.draft} resolveImage={resolveImage} />
+                )}
                 {mode === 'source' && <SourceView content={activeTab.draft} />}
                 {mode === 'edit' && (
                   <Editor

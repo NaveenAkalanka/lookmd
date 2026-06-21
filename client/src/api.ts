@@ -94,4 +94,8 @@ export const api = {
 
   move: (req: MoveRequest): Promise<MoveResponse> =>
     sendJson('POST', '/api/move', req),
+
+  /** URL the browser can GET for an image asset's raw bytes. */
+  rawUrl: (root: string, path: string): string =>
+    `/api/raw?root=${q(root)}&path=${q(path)}`,
 };

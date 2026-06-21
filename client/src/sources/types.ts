@@ -41,4 +41,7 @@ export interface FileSource {
   remove(path: string): Promise<DeleteFileResponse>;
   /** Rename / move a file within the same workspace. */
   move(from: string, to: string): Promise<MoveResponse>;
+  /** A URL usable as an <img> src for an asset (image) at `path`, relative to
+   *  the workspace root. REST returns an endpoint URL; FSA a blob: URL. */
+  assetUrl(path: string): Promise<string>;
 }

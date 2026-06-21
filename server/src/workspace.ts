@@ -25,6 +25,7 @@ import {
   resolveInRoot,
   assertNoSymlinkEscape,
   assertAllowedFile,
+  assertAllowedImage,
   isAllowedFile,
   isInside,
   toPosix,
@@ -33,6 +34,19 @@ import { HttpError } from './errors.ts';
 
 /** Directories never descended into, even though they aren't dotfiles. */
 const SKIP_DIRS: ReadonlySet<string> = new Set(['node_modules']);
+
+/** Content types for the image extensions the asset endpoint will serve. */
+const IMAGE_CONTENT_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.avif': 'image/avif',
+  '.bmp': 'image/bmp',
+  '.ico': 'image/x-icon',
+};
 
 export function hashContent(buf: Buffer): string {
   return crypto.createHash('sha256').update(buf).digest('hex');
@@ -194,6 +208,39 @@ export async function readFile(
     content: buf.toString('utf8'),
     hash: hashContent(buf),
   };
+}
+
+/** GET /api/raw — raw bytes of an image asset, for inline rendering in the Read
+ *  view. Same containment + symlink rules as files, but an image allowlist
+ *  instead of the text one. Read-only: available even in a view-only build. */
+export async function readAsset(
+  base: string,
+  root: string,
+  relPath: string,
+): Promise<{ buffer: Buffer; contentType: string }> {
+  if (relPath.trim() === '') {
+    throw new HttpError(400, 'INVALID_PATH', 'path is required');
+  }
+  const resolved = resolveInRoot({ base, root, relPath });
+  assertNoSymlinkEscape(base, resolved.rootAbs);
+  assertAllowedImage(resolved.targetAbs);
+  assertNoSymlinkEscape(resolved.rootAbs, resolved.targetAbs);
+
+  let buf: Buffer;
+  try {
+    buf = await fsp.readFile(resolved.targetAbs);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new HttpError(404, 'NOT_FOUND', `image not found: ${relPath}`);
+    }
+    if ((err as NodeJS.ErrnoException).code === 'EISDIR') {
+      throw new HttpError(400, 'INVALID_PATH', `path is a directory: ${relPath}`);
+    }
+    throw err;
+  }
+
+  const ext = path.extname(resolved.targetAbs).toLowerCase();
+  return { buffer: buf, contentType: IMAGE_CONTENT_TYPES[ext] ?? 'application/octet-stream' };
 }
 
 /**

@@ -16,5 +16,6 @@ export function createRestSource(root: string): FileSource {
     create: (path, content) => api.create({ root, path, content }),
     remove: (path) => api.remove({ root, path }),
     move: (from, to) => api.move({ root, from, to }),
+    assetUrl: (path) => Promise.resolve(api.rawUrl(root, path)),
   };
 }

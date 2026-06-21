@@ -168,3 +168,24 @@ describe('GET /api/file', () => {
     assert.equal((res.json() as ApiError).code, 'INVALID_PATH');
   });
 });
+
+describe('GET /api/raw', () => {
+  it('serves an allowed image with its content type', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/raw?root=ws&path=image.png' });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.headers['content-type'], 'image/png');
+    assert.deepEqual(res.rawPayload, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  });
+
+  it('400s on a non-image type', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/raw?root=ws&path=note.md' });
+    assert.equal(res.statusCode, 400);
+    assert.equal((res.json() as ApiError).code, 'DISALLOWED_TYPE');
+  });
+
+  it('403s on a traversal escape', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/raw?root=ws&path=../other.md' });
+    assert.equal(res.statusCode, 403);
+    assert.equal((res.json() as ApiError).code, 'OUTSIDE_ROOT');
+  });
+});

@@ -18,6 +18,7 @@ import {
   listFolders,
   getTree,
   readFile,
+  readAsset,
   writeFile,
   createFile,
   deleteFile,
@@ -49,6 +50,15 @@ export function buildApp(config: Config): FastifyInstance {
   app.get('/api/file', async (req) => {
     const { root = '', path = '' } = req.query as { root?: string; path?: string };
     return readFile(config.base, root, path);
+  });
+
+  // Raw image bytes for inline rendering in the Read view (read-only).
+  app.get('/api/raw', async (req, reply) => {
+    const { root = '', path = '' } = req.query as { root?: string; path?: string };
+    const { buffer, contentType } = await readAsset(config.base, root, path);
+    reply.header('content-type', contentType);
+    reply.header('cache-control', 'no-cache');
+    return reply.send(buffer);
   });
 
   // Write endpoints exist only when writes are enabled (deployment split: a

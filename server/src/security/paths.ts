@@ -164,6 +164,32 @@ export function assertAllowedFile(p: string): void {
   }
 }
 
+/** Image types the server will serve read-only (for inline rendering). */
+export const ALLOWED_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.avif',
+  '.bmp',
+  '.ico',
+]);
+
+export function isAllowedImage(p: string): boolean {
+  return ALLOWED_IMAGE_EXTENSIONS.has(path.extname(p).toLowerCase());
+}
+
+export function assertAllowedImage(p: string): void {
+  if (!isAllowedImage(p)) {
+    throw new PathValidationError(
+      'DISALLOWED_TYPE',
+      `image type not permitted: ${path.basename(p)}`,
+    );
+  }
+}
+
 // --- Symlink containment (filesystem) ---------------------------------------
 
 /**

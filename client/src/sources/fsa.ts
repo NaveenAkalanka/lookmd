@@ -105,6 +105,10 @@ function compareNodes(a: TreeNode, b: TreeNode): number {
 }
 
 export function createFsaSource(root: FileSystemDirectoryHandle): FileSource {
+  // Blob URLs for assets, cached per path so repeated renders reuse one object
+  // URL. They live until the page unloads — acceptable for a local tool.
+  const assetCache = new Map<string, string>();
+
   /** Walk down to the directory holding `parts`, optionally creating it. */
   async function dirFor(parts: string[], create: boolean): Promise<FileSystemDirectoryHandle> {
     let cur = root;
@@ -264,6 +268,21 @@ export function createFsaSource(root: FileSystemDirectoryHandle): FileSource {
         await writable.close();
         await srcDir.removeEntry(src.name);
         return { from, to };
+      } catch (e) {
+        mapError(e);
+      }
+    },
+
+    async assetUrl(path) {
+      const cached = assetCache.get(path);
+      if (cached) return cached;
+      const { parts, name } = locate(path);
+      try {
+        const dir = await dirFor(parts, false);
+        const fh = await dir.getFileHandle(name, { create: false });
+        const url = URL.createObjectURL(await fh.getFile());
+        assetCache.set(path, url);
+        return url;
       } catch (e) {
         mapError(e);
       }

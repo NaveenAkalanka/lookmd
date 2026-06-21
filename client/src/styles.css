@@ -1073,6 +1073,22 @@ body {
   border: 1px solid var(--border);
   padding: 6px 10px;
 }
+.img-missing {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  font-size: 0.9em;
+}
+.img-loading {
+  display: inline-block;
+  min-width: 80px;
+  height: 1.2em;
+  border-radius: 4px;
+  background: var(--border);
+  opacity: 0.4;
+}
 .read img {
   max-width: 100%;
 }
