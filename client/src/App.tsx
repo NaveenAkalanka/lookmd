@@ -20,6 +20,7 @@ import {
 } from './storage';
 import { WorkspacePicker } from './components/WorkspacePicker';
 import { FileTree } from './components/FileTree';
+import { CommandPalette } from './components/CommandPalette';
 // The view components carry the heavy rendering/highlighting stacks
 // (react-markdown, highlight.js, CodeMirror). The first screen is just the
 // picker, so load them only once a file is actually open.
@@ -85,6 +86,15 @@ function baseName(path: string): string {
   return path.split('/').pop() ?? path;
 }
 
+/** Flatten the tree to just the file paths, for the quick-open palette. */
+function flattenFiles(nodes: TreeNode[], acc: string[] = []): string[] {
+  for (const n of nodes) {
+    if (n.type === 'file') acc.push(n.path);
+    else if (n.children) flattenFiles(n.children, acc);
+  }
+  return acc;
+}
+
 /** Default a bare name to `.md` so it passes the backend's text allowlist. */
 function ensureTextExt(name: string): string {
   if (name === '') return '';
@@ -119,6 +129,7 @@ export function App() {
   const [theme, setTheme] = useState<ThemeId>(() => getTheme());
   const [fonts, setFonts] = useState<Fonts>(() => getFonts());
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   // Sidebar: a persisted pref (manual collapse + auto-hide) plus a transient
   // `peek` for the hover-reveal used in auto-hide mode.
@@ -335,6 +346,18 @@ export function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [toggleSidebar]);
+
+  // Ctrl/Cmd-P opens the quick-open palette (overriding the browser print dialog).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Conflict resolution: discard local edits and re-read from disk.
   const discardAndReload = useCallback(async () => {
@@ -678,6 +701,16 @@ export function App() {
       </div>
 
       {settingsModal}
+      {paletteOpen && (
+        <CommandPalette
+          files={flattenFiles(tree)}
+          onOpen={(p) => {
+            openFile(p);
+            setPaletteOpen(false);
+          }}
+          onClose={() => setPaletteOpen(false)}
+        />
+      )}
     </div>
   );
 }

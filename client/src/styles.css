@@ -619,6 +619,78 @@ body {
   right: 12px;
   z-index: 10;
 }
+/* --- Quick-open palette -------------------------------------------------- */
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 16px;
+  background: color-mix(in srgb, #000 42%, transparent);
+}
+.palette {
+  width: 540px;
+  max-width: 100%;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.palette-input {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+  outline: none;
+}
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+}
+.palette-empty {
+  padding: 12px 10px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+.palette-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.palette-item-active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.palette-item-name {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+.palette-item-dir {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Appearance opens as a floating window centered over a dim backdrop. */
 .settings-backdrop {
   position: fixed;
