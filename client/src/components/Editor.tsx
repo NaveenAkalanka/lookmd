@@ -15,6 +15,8 @@ import { basicSetup } from 'codemirror';
 import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, Prec } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags as t } from '@lezer/highlight';
 
 interface Props {
   /** Current buffer contents (the draft). */
@@ -60,6 +62,36 @@ const themeFromTokens = EditorView.theme({
   },
 });
 
+/**
+ * Syntax highlighting whose every color is a `--syntax-*` token, so the editor
+ * recolors with the active theme like everything else. basicSetup registers the
+ * library's defaultHighlightStyle only as a *fallback*, so this non-fallback
+ * style replaces it wholesale. Tags cover both Markdown structure (headings,
+ * emphasis, links, lists) and the code embedded in fenced blocks.
+ */
+const lookmdHighlightStyle = HighlightStyle.define([
+  { tag: [t.keyword, t.moduleKeyword, t.controlKeyword], color: 'var(--syntax-keyword)' },
+  { tag: [t.string, t.special(t.string), t.regexp], color: 'var(--syntax-string)' },
+  { tag: [t.comment, t.lineComment, t.blockComment, t.meta], color: 'var(--syntax-comment)', fontStyle: 'italic' },
+  { tag: [t.number, t.integer, t.float], color: 'var(--syntax-number)' },
+  { tag: [t.function(t.variableName), t.function(t.propertyName), t.labelName], color: 'var(--syntax-function)' },
+  { tag: [t.typeName, t.className, t.namespace, t.standard(t.name)], color: 'var(--syntax-type)' },
+  { tag: [t.bool, t.null, t.atom, t.constant(t.variableName)], color: 'var(--syntax-constant)' },
+  { tag: [t.variableName, t.self], color: 'var(--syntax-variable)' },
+  { tag: [t.operator, t.operatorKeyword, t.derefOperator], color: 'var(--syntax-operator)' },
+  { tag: [t.punctuation, t.separator, t.bracket, t.brace, t.paren], color: 'var(--syntax-punctuation)' },
+  { tag: [t.propertyName, t.attributeName, t.definition(t.propertyName)], color: 'var(--syntax-property)' },
+  { tag: [t.tagName, t.angleBracket], color: 'var(--syntax-tag)' },
+  { tag: [t.heading, t.heading1, t.heading2, t.heading3, t.heading4, t.heading5, t.heading6], color: 'var(--syntax-heading)', fontWeight: 'bold' },
+  { tag: [t.link, t.url], color: 'var(--syntax-link)', textDecoration: 'underline' },
+  { tag: t.strong, fontWeight: 'bold', color: 'var(--text-primary)' },
+  { tag: t.emphasis, fontStyle: 'italic' },
+  { tag: t.strikethrough, textDecoration: 'line-through' },
+  { tag: [t.list, t.quote], color: 'var(--syntax-punctuation)' },
+  { tag: [t.monospace, t.literal], color: 'var(--syntax-string)' },
+  { tag: t.invalid, color: 'var(--danger)' },
+]);
+
 export function Editor({ value, docKey, onChange, onSave }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -98,6 +130,7 @@ export function Editor({ value, docKey, onChange, onSave }: Props) {
           saveKeymap,
           basicSetup,
           markdown(),
+          syntaxHighlighting(lookmdHighlightStyle),
           themeFromTokens,
           EditorView.lineWrapping,
           EditorView.updateListener.of((update) => {

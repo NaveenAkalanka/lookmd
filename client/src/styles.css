@@ -21,6 +21,23 @@
   --border: #e3dccf;
   --danger: #b3261e;
 
+  /* Syntax palette — one set per theme, shared by all three modes (the
+   * CodeMirror editor, rendered code blocks, and the raw-source view). */
+  --syntax-keyword: #9d2f5e;
+  --syntax-string: #5a7d2a;
+  --syntax-comment: #a79e90;
+  --syntax-number: #b5651d;
+  --syntax-function: #2a6b8a;
+  --syntax-type: #8a6d1f;
+  --syntax-constant: #b5651d;
+  --syntax-variable: #5c554d;
+  --syntax-operator: #9a5b34;
+  --syntax-punctuation: #8a8178;
+  --syntax-property: #2a6b8a;
+  --syntax-tag: #9d2f5e;
+  --syntax-heading: #9a5b34;
+  --syntax-link: #2a6b8a;
+
   --font-read: Georgia, 'Times New Roman', serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Consolas', monospace;
   --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -45,6 +62,20 @@
   --accent-2: var(--accent);
   --border: #e3dccf;
   --danger: #b3261e;
+  --syntax-keyword: #9d2f5e;
+  --syntax-string: #5a7d2a;
+  --syntax-comment: #a79e90;
+  --syntax-number: #b5651d;
+  --syntax-function: #2a6b8a;
+  --syntax-type: #8a6d1f;
+  --syntax-constant: #b5651d;
+  --syntax-variable: #5c554d;
+  --syntax-operator: #9a5b34;
+  --syntax-punctuation: #8a8178;
+  --syntax-property: #2a6b8a;
+  --syntax-tag: #9d2f5e;
+  --syntax-heading: #9a5b34;
+  --syntax-link: #2a6b8a;
   color-scheme: light;
 }
 
@@ -59,6 +90,20 @@
   --accent-2: var(--accent);
   --border: #d7e0ea;
   --danger: #dc2626;
+  --syntax-keyword: #7c3aed;
+  --syntax-string: #0f766e;
+  --syntax-comment: #8295a8;
+  --syntax-number: #b45309;
+  --syntax-function: #2563eb;
+  --syntax-type: #0e7490;
+  --syntax-constant: #b45309;
+  --syntax-variable: #45576b;
+  --syntax-operator: #2563eb;
+  --syntax-punctuation: #8295a8;
+  --syntax-property: #0e7490;
+  --syntax-tag: #7c3aed;
+  --syntax-heading: #2563eb;
+  --syntax-link: #2563eb;
   color-scheme: light;
 }
 
@@ -73,6 +118,20 @@
   --accent-2: var(--accent);
   --border: #36363f;
   --danger: #f87171;
+  --syntax-keyword: #c792ea;
+  --syntax-string: #c3e88d;
+  --syntax-comment: #6b7280;
+  --syntax-number: #f78c6c;
+  --syntax-function: #82aaff;
+  --syntax-type: #ffcb6b;
+  --syntax-constant: #f78c6c;
+  --syntax-variable: #e7e7ec;
+  --syntax-operator: #89ddff;
+  --syntax-punctuation: #9aa0ab;
+  --syntax-property: #82aaff;
+  --syntax-tag: #f07178;
+  --syntax-heading: #6ea8fe;
+  --syntax-link: #6ea8fe;
   color-scheme: dark;
 }
 
@@ -88,6 +147,20 @@
   --accent-2: #c9a227;
   --border: #2b211f;
   --danger: #e2575c;
+  --syntax-keyword: #c0392b;
+  --syntax-string: #a9b665;
+  --syntax-comment: #6e655a;
+  --syntax-number: #d08b3a;
+  --syntax-function: #c9a227;
+  --syntax-type: #d4a857;
+  --syntax-constant: #d08b3a;
+  --syntax-variable: #e9e2d2;
+  --syntax-operator: #c0392b;
+  --syntax-punctuation: #8a7f6f;
+  --syntax-property: #c9a227;
+  --syntax-tag: #c0392b;
+  --syntax-heading: #c9a227;
+  --syntax-link: #c9a227;
   color-scheme: dark;
 }
 
