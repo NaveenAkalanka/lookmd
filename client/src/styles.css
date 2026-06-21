@@ -351,6 +351,45 @@ body {
 }
 
 /* --- File bar (name + mode toggle + save) -------------------------------- */
+/* --- Outline (active file's headings) ------------------------------------ */
+.outline {
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+  padding: 8px 0;
+}
+.outline-head {
+  padding: 4px 12px 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+.outline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.outline-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 3px 12px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.outline-item:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
 /* --- Open-file tabs ------------------------------------------------------ */
 .tabbar {
   display: flex;

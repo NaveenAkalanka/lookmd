@@ -21,6 +21,7 @@ import {
 import { WorkspacePicker } from './components/WorkspacePicker';
 import { FileTree } from './components/FileTree';
 import { CommandPalette } from './components/CommandPalette';
+import { Outline } from './components/Outline';
 // The view components carry the heavy rendering/highlighting stacks
 // (react-markdown, highlight.js, CodeMirror). The first screen is just the
 // picker, so load them only once a file is actually open.
@@ -529,6 +530,15 @@ export function App() {
     [source, activeDir, tree, openFile],
   );
 
+  // Jump to a heading from the outline: ensure Read mode, then scroll to its id
+  // (rehype-slug puts matching ids on the rendered headings).
+  const jumpToHeading = useCallback((slug: string) => {
+    setMode('read');
+    window.setTimeout(() => {
+      document.getElementById(slug)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  }, []);
+
   const settingsButton = (
     <button
       className="btn icon-btn"
@@ -642,6 +652,9 @@ export function App() {
               onRename={(path) => void renameFile(path)}
               onDelete={(path) => void deleteFile(path)}
             />
+          )}
+          {activeTab && activeTab.content !== null && (
+            <Outline content={activeTab.draft} onJump={jumpToHeading} />
           )}
         </aside>
 
