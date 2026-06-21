@@ -1,12 +1,14 @@
 /**
- * App shell. Holds the active workspace, the open file, and the editing loop:
- * a Read/Source/Edit toggle over one draft buffer, explicit hash-checked save,
- * 409-conflict handling, and a dirty-buffer guard. Layout is VS Code-style:
- * header + file-tree sidebar + content pane.
+ * App shell. Holds the active workspace and a set of open files as tabs. Each
+ * tab carries its own draft, last-saved snapshot, and conflict/save state, so
+ * switching tabs preserves edits. Per file: a Read/Source/Edit toggle over the
+ * tab's draft, explicit hash-checked save, 409-conflict handling, and a
+ * dirty-buffer guard. Layout is VS Code-style: header + file-tree sidebar +
+ * tab strip + content pane.
  */
 
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { TreeNode, GetFileResponse } from '@lookmd/shared';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import type { TreeNode } from '@lookmd/shared';
 import { ApiRequestError } from './api';
 import { createRestSource } from './sources/rest';
 import type { FileSource } from './sources/types';
@@ -44,6 +46,45 @@ import {
   type SidebarPref,
 } from './settings';
 
+/** One open file. `content`/`hash` are the last-saved snapshot (null until the
+ *  initial load resolves); `draft` is the live buffer shown in every mode. */
+interface Tab {
+  path: string;
+  content: string | null;
+  hash: string | null;
+  draft: string;
+  loading: boolean;
+  error: string | null;
+  conflict: boolean;
+  saveError: string | null;
+  saving: boolean;
+  /** Bumped on a reload so the editor re-seeds its document from fresh content. */
+  reloadNonce: number;
+}
+
+function newTab(path: string): Tab {
+  return {
+    path,
+    content: null,
+    hash: null,
+    draft: '',
+    loading: true,
+    error: null,
+    conflict: false,
+    saveError: null,
+    saving: false,
+    reloadNonce: 0,
+  };
+}
+
+function tabDirty(t: Tab): boolean {
+  return t.content !== null && t.draft !== t.content;
+}
+
+function baseName(path: string): string {
+  return path.split('/').pop() ?? path;
+}
+
 /** Default a bare name to `.md` so it passes the backend's text allowlist. */
 function ensureTextExt(name: string): string {
   if (name === '') return '';
@@ -57,25 +98,22 @@ export function App() {
     // be auto-restored — only reopen REST ones; FSA recents wait in the picker.
     return last && last.kind === 'rest' ? last : null;
   });
+  // The active workspace's file source, set by whoever opened it. REST sources
+  // can be rebuilt synchronously on restore; FSA ones arrive via the picker.
+  const [source, setSource] = useState<FileSource | null>(() =>
+    workspace ? createRestSource(workspace.root) : null,
+  );
+
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [treeError, setTreeError] = useState<string | null>(null);
   const [treeLoading, setTreeLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const [openPath, setOpenPath] = useState<string | null>(null);
-  // `file` is the last-saved snapshot (content + hash). `draft` is the live
-  // buffer shown in every mode; dirty === they differ.
-  const [file, setFile] = useState<GetFileResponse | null>(null);
-  const [draft, setDraft] = useState('');
-  const [fileError, setFileError] = useState<string | null>(null);
-  const [fileLoading, setFileLoading] = useState(false);
+  // Open files as tabs, plus which one is active.
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activePath, setActivePath] = useState<string | null>(null);
 
   const [mode, setMode] = useState<ViewMode>('read');
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [conflict, setConflict] = useState(false);
-  // Bumped on a reload so the editor re-seeds its document from fresh content.
-  const [reloadNonce, setReloadNonce] = useState(0);
 
   // Appearance (already applied to the DOM at bootstrap; mirror it in state).
   const [theme, setTheme] = useState<ThemeId>(() => getTheme());
@@ -87,6 +125,13 @@ export function App() {
   const [sidebar, setSidebarState] = useState<SidebarPref>(() => getSidebar());
   const [peek, setPeek] = useState(false);
   const sidebarVisible = sidebar.autoHide ? peek : !sidebar.collapsed;
+
+  const activeTab = tabs.find((t) => t.path === activePath) ?? null;
+  const anyDirty = tabs.some(tabDirty);
+
+  const updateTab = useCallback((path: string, patch: Partial<Tab>) => {
+    setTabs((ts) => ts.map((t) => (t.path === path ? { ...t, ...patch } : t)));
+  }, []);
 
   const changeTheme = useCallback((t: ThemeId) => {
     setTheme(t);
@@ -130,14 +175,6 @@ export function App() {
   // Clear any pending timer on unmount.
   useEffect(() => cancelHide, [cancelHide]);
 
-  const dirty = file !== null && draft !== file.content;
-
-  // The active workspace's file source, set by whoever opened it. REST sources
-  // can be rebuilt synchronously on restore; FSA ones arrive via the picker.
-  const [source, setSource] = useState<FileSource | null>(() =>
-    workspace ? createRestSource(workspace.root) : null,
-  );
-
   const loadTree = useCallback(async () => {
     if (!source) return;
     setTreeLoading(true);
@@ -158,26 +195,22 @@ export function App() {
     void loadTree();
   }, [loadTree]);
 
-  // Warn on tab close / reload while there are unsaved changes.
+  // Warn on tab/window close while any open file has unsaved changes.
   useEffect(() => {
-    if (!dirty) return;
+    if (!anyDirty) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [dirty]);
+  }, [anyDirty]);
 
   const switchWorkspace = useCallback(
     (ws: Workspace | null, src: FileSource | null = null) => {
-      if (dirty && !window.confirm('You have unsaved changes. Discard them?')) return;
-      setOpenPath(null);
-      setFile(null);
-      setDraft('');
-      setFileError(null);
-      setConflict(false);
-      setSaveError(null);
+      if (anyDirty && !window.confirm('You have unsaved changes. Discard them?')) return;
+      setTabs([]);
+      setActivePath(null);
       if (ws && src) {
         setWorkspace(ws);
         setSource(src);
@@ -188,55 +221,95 @@ export function App() {
         setSource(null);
       }
     },
-    [dirty],
+    [anyDirty],
   );
 
+  // Fetch a tab's content from the source.
+  const loadTab = useCallback(
+    (path: string) => {
+      if (!source) return;
+      updateTab(path, { loading: true, error: null });
+      source
+        .file(path)
+        .then((res) =>
+          updateTab(path, {
+            content: res.content,
+            hash: res.hash,
+            draft: res.content,
+            loading: false,
+            error: null,
+          }),
+        )
+        .catch((err: unknown) =>
+          updateTab(path, {
+            loading: false,
+            error: err instanceof ApiRequestError ? err.message : 'failed to open file',
+          }),
+        );
+    },
+    [source, updateTab],
+  );
+
+  // Open a file: focus its tab if already open, otherwise add one and load it.
   const openFile = useCallback(
     (path: string) => {
       if (!source) return;
-      if (path === openPath) return;
-      if (dirty && !window.confirm('You have unsaved changes. Discard them?')) return;
       setPeek(false); // collapse the auto-hide overlay once a file is chosen
-      setOpenPath(path);
-      setFile(null);
-      setDraft('');
-      setFileError(null);
-      setSaveError(null);
-      setConflict(false);
-      setFileLoading(true);
-      source
-        .file(path)
-        .then((res) => {
-          setFile(res);
-          setDraft(res.content);
-        })
-        .catch((err: unknown) => {
-          setFileError(err instanceof ApiRequestError ? err.message : 'failed to open file');
-        })
-        .finally(() => setFileLoading(false));
+      setActivePath(path);
+      if (!tabs.some((t) => t.path === path)) {
+        setTabs((ts) => (ts.some((t) => t.path === path) ? ts : [...ts, newTab(path)]));
+        loadTab(path);
+      }
     },
-    [source, openPath, dirty],
+    [source, tabs, loadTab],
+  );
+
+  const activateTab = useCallback((path: string) => setActivePath(path), []);
+
+  // Remove a tab without prompting (caller decides), moving focus to a neighbor.
+  const dropTab = useCallback(
+    (path: string) => {
+      const idx = tabs.findIndex((t) => t.path === path);
+      if (idx === -1) return;
+      const next = tabs.filter((t) => t.path !== path);
+      setTabs(next);
+      if (activePath === path) {
+        setActivePath(next.length ? next[Math.min(idx, next.length - 1)]!.path : null);
+      }
+    },
+    [tabs, activePath],
+  );
+
+  const closeTab = useCallback(
+    (path: string) => {
+      const tab = tabs.find((t) => t.path === path);
+      if (tab && tabDirty(tab) && !window.confirm('Close without saving? Unsaved changes will be lost.')) {
+        return;
+      }
+      dropTab(path);
+    },
+    [tabs, dropTab],
   );
 
   const save = useCallback(async () => {
-    if (!source || !file || !openPath || saving) return;
-    if (draft === file.content) return; // nothing to save
-    setSaving(true);
-    setSaveError(null);
-    setConflict(false);
+    if (!source || !activeTab || activeTab.content === null || activeTab.saving) return;
+    if (activeTab.draft === activeTab.content) return; // nothing to save
+    const { path, draft: text, hash } = activeTab;
+    updateTab(path, { saving: true, saveError: null, conflict: false });
     try {
-      const res = await source.save(openPath, draft, file.hash);
-      setFile({ path: openPath, content: draft, hash: res.hash });
+      const res = await source.save(path, text, hash ?? '');
+      updateTab(path, { content: text, hash: res.hash, saving: false });
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === 'CONFLICT') {
-        setConflict(true);
+        updateTab(path, { conflict: true, saving: false });
       } else {
-        setSaveError(err instanceof ApiRequestError ? err.message : 'save failed');
+        updateTab(path, {
+          saveError: err instanceof ApiRequestError ? err.message : 'save failed',
+          saving: false,
+        });
       }
-    } finally {
-      setSaving(false);
     }
-  }, [source, file, openPath, draft, saving]);
+  }, [source, activeTab, updateTab]);
 
   // Global Ctrl/Cmd-S so saving works in any mode (and never triggers the
   // browser's own save dialog).
@@ -265,36 +338,53 @@ export function App() {
 
   // Conflict resolution: discard local edits and re-read from disk.
   const discardAndReload = useCallback(async () => {
-    if (!source || !openPath) return;
+    if (!source || !activeTab) return;
+    const { path, reloadNonce } = activeTab;
     try {
-      const fresh = await source.file(openPath);
-      setFile(fresh);
-      setDraft(fresh.content);
-      setConflict(false);
-      setSaveError(null);
-      setReloadNonce((n) => n + 1);
+      const fresh = await source.file(path);
+      updateTab(path, {
+        content: fresh.content,
+        hash: fresh.hash,
+        draft: fresh.content,
+        conflict: false,
+        saveError: null,
+        reloadNonce: reloadNonce + 1,
+      });
     } catch (err) {
-      setSaveError(err instanceof ApiRequestError ? err.message : 'reload failed');
+      updateTab(path, { saveError: err instanceof ApiRequestError ? err.message : 'reload failed' });
     }
-  }, [source, openPath]);
+  }, [source, activeTab, updateTab]);
 
   // Conflict resolution: keep local edits and overwrite, re-reading only to get
   // the current hash so the second save passes the check.
   const overwrite = useCallback(async () => {
-    if (!source || !openPath) return;
-    setSaving(true);
+    if (!source || !activeTab) return;
+    const { path, draft: text } = activeTab;
+    updateTab(path, { saving: true });
     try {
-      const fresh = await source.file(openPath);
-      const res = await source.save(openPath, draft, fresh.hash);
-      setFile({ path: openPath, content: draft, hash: res.hash });
-      setConflict(false);
-      setSaveError(null);
+      const fresh = await source.file(path);
+      const res = await source.save(path, text, fresh.hash);
+      updateTab(path, {
+        content: text,
+        hash: res.hash,
+        conflict: false,
+        saveError: null,
+        saving: false,
+      });
     } catch (err) {
-      setSaveError(err instanceof ApiRequestError ? err.message : 'overwrite failed');
-    } finally {
-      setSaving(false);
+      updateTab(path, {
+        saveError: err instanceof ApiRequestError ? err.message : 'overwrite failed',
+        saving: false,
+      });
     }
-  }, [source, openPath, draft]);
+  }, [source, activeTab, updateTab]);
+
+  const setActiveDraft = useCallback(
+    (next: string) => {
+      if (activePath) updateTab(activePath, { draft: next });
+    },
+    [activePath, updateTab],
+  );
 
   // --- Tree actions (create / rename / delete) ---------------------------
   // The backend only operates on text files (and refuses to move/delete dirs),
@@ -323,7 +413,7 @@ export function App() {
   const renameFile = useCallback(
     async (path: string) => {
       if (!source) return;
-      const base = path.split('/').pop() ?? path;
+      const base = baseName(path);
       const input = window.prompt('Rename file to:', base);
       if (input === null) return;
       const newName = ensureTextExt(input.trim());
@@ -333,16 +423,15 @@ export function App() {
       setActionError(null);
       try {
         await source.move(path, to);
-        if (openPath === path) {
-          setOpenPath(to);
-          setFile((f) => (f ? { ...f, path: to } : f));
-        }
+        // Keep an open tab pointing at the renamed file.
+        setTabs((ts) => ts.map((t) => (t.path === path ? { ...t, path: to } : t)));
+        setActivePath((cur) => (cur === path ? to : cur));
         await loadTree();
       } catch (err) {
         setActionError(err instanceof ApiRequestError ? err.message : 'could not rename file');
       }
     },
-    [source, openPath, loadTree],
+    [source, loadTree],
   );
 
   const deleteFile = useCallback(
@@ -352,24 +441,18 @@ export function App() {
       setActionError(null);
       try {
         await source.remove(path);
-        if (openPath === path) {
-          setOpenPath(null);
-          setFile(null);
-          setDraft('');
-          setMode('read');
-        }
+        dropTab(path);
         await loadTree();
       } catch (err) {
         setActionError(err instanceof ApiRequestError ? err.message : 'could not delete file');
       }
     },
-    [source, openPath, loadTree],
+    [source, dropTab, loadTree],
   );
 
-  const docKey = useMemo(
-    () => `${workspace?.root ?? ''}::${openPath ?? ''}#${reloadNonce}`,
-    [workspace, openPath, reloadNonce],
-  );
+  const docKey = activeTab
+    ? `${workspace?.root ?? ''}::${activeTab.path}#${activeTab.reloadNonce}`
+    : '';
 
   const settingsControl = (
     <span className="settings-anchor">
@@ -404,8 +487,6 @@ export function App() {
       </div>
     );
   }
-
-  const hasFile = openPath !== null && file !== null && !fileLoading && !fileError;
 
   return (
     <div className="app">
@@ -480,7 +561,7 @@ export function App() {
           {!treeLoading && !treeError && (
             <FileTree
               tree={tree}
-              activePath={openPath}
+              activePath={activePath}
               onOpenFile={openFile}
               onNewFile={(dir) => void newFile(dir)}
               onRename={(path) => void renameFile(path)}
@@ -490,24 +571,67 @@ export function App() {
         </aside>
 
         <main className="content">
-          {hasFile && (
+          {tabs.length > 0 && (
+            <div className="tabbar" role="tablist">
+              {tabs.map((t) => (
+                <div
+                  key={t.path}
+                  className={`tab${t.path === activePath ? ' tab-active' : ''}`}
+                  role="tab"
+                  aria-selected={t.path === activePath}
+                  title={t.path}
+                  onClick={() => activateTab(t.path)}
+                  onMouseDown={(e) => {
+                    if (e.button === 1) {
+                      e.preventDefault();
+                      closeTab(t.path);
+                    }
+                  }}
+                >
+                  <span className="tab-name">{baseName(t.path)}</span>
+                  {tabDirty(t) && (
+                    <span className="dirty-dot" aria-label="Unsaved changes">
+                      ●
+                    </span>
+                  )}
+                  <button
+                    className="tab-close"
+                    title="Close"
+                    aria-label={`Close ${baseName(t.path)}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTab(t.path);
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab && activeTab.content !== null && !activeTab.error && (
             <div className="file-bar">
-              <span className="file-bar-name" title={openPath ?? undefined}>
-                {openPath}
-                {dirty && <span className="dirty-dot" title="Unsaved changes" aria-label="Unsaved changes">●</span>}
+              <span className="file-bar-name" title={activeTab.path}>
+                {activeTab.path}
+                {tabDirty(activeTab) && (
+                  <span className="dirty-dot" title="Unsaved changes" aria-label="Unsaved changes">
+                    ●
+                  </span>
+                )}
               </span>
               <ModeToggle mode={mode} onChange={setMode} />
               <button
                 className="btn btn-accent"
                 onClick={() => void save()}
-                disabled={!dirty || saving}
+                disabled={!tabDirty(activeTab) || activeTab.saving}
               >
-                {saving ? 'Saving…' : 'Save'}
+                {activeTab.saving ? 'Saving…' : 'Save'}
               </button>
             </div>
           )}
 
-          {conflict && (
+          {activeTab && activeTab.conflict && (
             <div className="banner banner-warn">
               <span>
                 This file changed on disk since you opened it. Saving now would clobber
@@ -517,24 +641,35 @@ export function App() {
                 <button className="btn" onClick={() => void discardAndReload()}>
                   Reload from disk
                 </button>
-                <button className="btn" onClick={() => void overwrite()} disabled={saving}>
+                <button className="btn" onClick={() => void overwrite()} disabled={activeTab.saving}>
                   Overwrite anyway
                 </button>
               </span>
             </div>
           )}
-          {saveError && <div className="banner banner-error">{saveError}</div>}
+          {activeTab && activeTab.saveError && (
+            <div className="banner banner-error">{activeTab.saveError}</div>
+          )}
 
           <div className="view">
-            {!openPath && <div className="placeholder">Select a file to read.</div>}
-            {openPath && fileLoading && <div className="placeholder">Loading {openPath}…</div>}
-            {openPath && fileError && <div className="placeholder error">{fileError}</div>}
-            {hasFile && (
+            {!activeTab && <div className="placeholder">Select a file to read.</div>}
+            {activeTab && activeTab.loading && (
+              <div className="placeholder">Loading {activeTab.path}…</div>
+            )}
+            {activeTab && activeTab.error && (
+              <div className="placeholder error">{activeTab.error}</div>
+            )}
+            {activeTab && activeTab.content !== null && !activeTab.loading && !activeTab.error && (
               <Suspense fallback={<div className="placeholder">Loading…</div>}>
-                {mode === 'read' && <ReadView content={draft} />}
-                {mode === 'source' && <SourceView content={draft} />}
+                {mode === 'read' && <ReadView content={activeTab.draft} />}
+                {mode === 'source' && <SourceView content={activeTab.draft} />}
                 {mode === 'edit' && (
-                  <Editor value={draft} docKey={docKey} onChange={setDraft} onSave={() => void save()} />
+                  <Editor
+                    value={activeTab.draft}
+                    docKey={docKey}
+                    onChange={setActiveDraft}
+                    onSave={() => void save()}
+                  />
                 )}
               </Suspense>
             )}
