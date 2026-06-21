@@ -18,9 +18,15 @@ import {
 } from './storage';
 import { WorkspacePicker } from './components/WorkspacePicker';
 import { FileTree } from './components/FileTree';
-import { ReadView } from './components/ReadView';
-import { SourceView } from './components/SourceView';
-// CodeMirror is heavy; load it only when the user actually enters Edit mode.
+// The view components carry the heavy rendering/highlighting stacks
+// (react-markdown, highlight.js, CodeMirror). The first screen is just the
+// picker, so load them only once a file is actually open.
+const ReadView = lazy(() =>
+  import('./components/ReadView').then((m) => ({ default: m.ReadView })),
+);
+const SourceView = lazy(() =>
+  import('./components/SourceView').then((m) => ({ default: m.SourceView })),
+);
 const Editor = lazy(() =>
   import('./components/Editor').then((m) => ({ default: m.Editor })),
 );
@@ -429,11 +435,13 @@ export function App() {
             {!openPath && <div className="placeholder">Select a file to read.</div>}
             {openPath && fileLoading && <div className="placeholder">Loading {openPath}…</div>}
             {openPath && fileError && <div className="placeholder error">{fileError}</div>}
-            {hasFile && mode === 'read' && <ReadView content={draft} />}
-            {hasFile && mode === 'source' && <SourceView content={draft} />}
-            {hasFile && mode === 'edit' && (
-              <Suspense fallback={<div className="placeholder">Loading editor…</div>}>
-                <Editor value={draft} docKey={docKey} onChange={setDraft} onSave={() => void save()} />
+            {hasFile && (
+              <Suspense fallback={<div className="placeholder">Loading…</div>}>
+                {mode === 'read' && <ReadView content={draft} />}
+                {mode === 'source' && <SourceView content={draft} />}
+                {mode === 'edit' && (
+                  <Editor value={draft} docKey={docKey} onChange={setDraft} onSave={() => void save()} />
+                )}
               </Suspense>
             )}
           </div>
