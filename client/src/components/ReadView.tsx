@@ -17,6 +17,8 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
 import { remarkWikiLink } from '../markdown/remarkWikiLink';
+import { Icon } from './Icon';
+import { ImageNotFound01Icon } from '@hugeicons/core-free-icons';
 
 interface Props {
   content: string;
@@ -96,7 +98,12 @@ function MarkdownImage({ src, alt, resolve }: ImageProps) {
     };
   }, [src, resolve]);
 
-  if (failed) return <span className="img-missing">🖼 {alt || src}</span>;
+  if (failed)
+    return (
+      <span className="img-missing">
+        <Icon icon={ImageNotFound01Icon} size={16} /> {alt || src}
+      </span>
+    );
   if (url === null) return <span className="img-loading" aria-busy="true" />;
   return <img src={url} alt={alt ?? ''} />;
 }

@@ -27,6 +27,14 @@ import { WorkspacePicker } from './components/WorkspacePicker';
 import { FileTree } from './components/FileTree';
 import { CommandPalette } from './components/CommandPalette';
 import { Outline } from './components/Outline';
+import { Icon } from './components/Icon';
+import {
+  Menu01Icon,
+  Settings01Icon,
+  PinIcon,
+  Add01Icon,
+  Cancel01Icon,
+} from '@hugeicons/core-free-icons';
 // The view components carry the heavy rendering/highlighting stacks
 // (react-markdown, highlight.js, CodeMirror). The first screen is just the
 // picker, so load them only once a file is actually open.
@@ -642,7 +650,7 @@ export function App() {
       aria-expanded={settingsOpen}
       onClick={() => setSettingsOpen((o) => !o)}
     >
-      ⚙
+      <Icon icon={Settings01Icon} />
     </button>
   );
   const settingsModal = settingsOpen && (
@@ -679,7 +687,7 @@ export function App() {
           aria-expanded={sidebarVisible}
           onClick={toggleSidebar}
         >
-          ☰
+          <Icon icon={Menu01Icon} />
         </button>
         <span className="brand">lookmd</span>
         <span className="workspace-name" title={workspace.root || '/'}>
@@ -721,7 +729,7 @@ export function App() {
               aria-pressed={sidebar.autoHide}
               onClick={() => changeSidebar({ ...sidebar, autoHide: !sidebar.autoHide })}
             >
-              📌
+              <Icon icon={PinIcon} size={16} />
             </button>
             <button
               className="tree-action"
@@ -729,7 +737,7 @@ export function App() {
               aria-label="New file in workspace root"
               onClick={() => void newFile('')}
             >
-              ＋
+              <Icon icon={Add01Icon} size={16} />
             </button>
           </div>
           {actionError && (
@@ -787,7 +795,7 @@ export function App() {
                       closeTab(t.path);
                     }}
                   >
-                    ✕
+                    <Icon icon={Cancel01Icon} size={14} />
                   </button>
                 </div>
               ))}

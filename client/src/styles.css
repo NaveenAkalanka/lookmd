@@ -184,6 +184,10 @@ body {
 
 /* --- Buttons ------------------------------------------------------------- */
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text-primary);
@@ -209,6 +213,9 @@ body {
   padding: 5px 9px;
   font-size: 14px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .muted {
@@ -738,14 +745,22 @@ body {
   box-shadow: 0 20px 56px rgba(0, 0, 0, 0.4);
   overflow: hidden;
 }
+.palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-tertiary);
+}
 .palette-input {
+  flex: 1;
   font-family: var(--font-ui);
   font-size: 15px;
   color: var(--text-primary);
-  background: var(--surface);
+  background: transparent;
   border: none;
-  border-bottom: 1px solid var(--border);
-  padding: 14px 16px;
+  padding: 14px 0;
   outline: none;
 }
 .palette-list {
@@ -971,6 +986,9 @@ body {
   display: flex;
 }
 .tree-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: var(--surface);
   color: var(--text-secondary);
@@ -1078,6 +1096,9 @@ body {
   background: var(--background);
 }
 .picker-item-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
 }
 .picker-item-path {
@@ -1177,7 +1198,9 @@ body {
   padding: 6px 10px;
 }
 .img-missing {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 2px 8px;
   border: 1px dashed var(--border);
   border-radius: 6px;

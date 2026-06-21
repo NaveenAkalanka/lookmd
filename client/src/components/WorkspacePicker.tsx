@@ -27,6 +27,8 @@ import {
   type Workspace,
   type RecentWorkspace,
 } from '../storage';
+import { Icon } from './Icon';
+import { Folder01Icon, ComputerIcon, ArrowUp01Icon } from '@hugeicons/core-free-icons';
 
 interface Props {
   onOpen: (ws: Workspace, source: FileSource) => void;
@@ -133,7 +135,7 @@ export function WorkspacePicker({ onOpen }: Props) {
                 <li key={`${r.kind}:${r.root}`}>
                   <button className="picker-item" onClick={() => void openRecent(r)}>
                     <span className="picker-item-name">
-                      {r.kind === 'fsa' ? '💻 ' : ''}
+                      {r.kind === 'fsa' && <Icon icon={ComputerIcon} size={16} />}
                       {r.name}
                     </span>
                     <span className="picker-item-path">
@@ -155,7 +157,7 @@ export function WorkspacePicker({ onOpen }: Props) {
               disabled={parent === null || loading}
               onClick={() => parent !== null && browse(parent)}
             >
-              ↑ Up
+              <Icon icon={ArrowUp01Icon} size={15} /> Up
             </button>
             <button className="btn btn-accent" onClick={openRestFolder}>
               Open this folder
@@ -171,7 +173,9 @@ export function WorkspacePicker({ onOpen }: Props) {
             {folders.map((f) => (
               <li key={f.path}>
                 <button className="picker-item" onClick={() => browse(f.path)}>
-                  <span className="picker-item-name">📁 {f.name}</span>
+                  <span className="picker-item-name">
+                    <Icon icon={Folder01Icon} size={16} /> {f.name}
+                  </span>
                 </button>
               </li>
             ))}

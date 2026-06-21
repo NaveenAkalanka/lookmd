@@ -2,10 +2,12 @@
  * Appearance settings as a floating window: theme picker + reading/mono font
  * choosers, centered over a dim backdrop. Pure UI — it reports changes upward;
  * persistence and application live in `settings.ts`. Closes on backdrop click,
- * the ✕ button, or Escape.
+ * the close button, or Escape.
  */
 
 import { useEffect, useState } from 'react';
+import { Icon } from './Icon';
+import { Cancel01Icon } from '@hugeicons/core-free-icons';
 import {
   THEMES,
   READING_FONTS,
@@ -59,7 +61,7 @@ export function SettingsPanel({
         <div className="settings-window-head">
           <h2 className="settings-title">Appearance</h2>
           <button className="btn icon-btn" aria-label="Close settings" onClick={onClose}>
-            ✕
+            <Icon icon={Cancel01Icon} size={16} />
           </button>
         </div>
         <div className="settings-window-body">
@@ -110,7 +112,7 @@ export function SettingsPanel({
           />
           Auto-hide — reveal on hover at the left edge
         </label>
-        <p className="setting-hint">Toggle the sidebar anytime with the ☰ button or Ctrl/Cmd-B.</p>
+        <p className="setting-hint">Toggle the sidebar anytime from the toolbar or with Ctrl/Cmd-B.</p>
           </section>
 
           <section className="settings-section">

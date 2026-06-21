@@ -7,6 +7,8 @@
 
 import { useState } from 'react';
 import type { TreeNode } from '@lookmd/shared';
+import { Icon } from './Icon';
+import { Add01Icon, PencilEdit02Icon, Delete02Icon } from '@hugeicons/core-free-icons';
 
 interface Actions {
   onOpenFile: (path: string) => void;
@@ -22,7 +24,7 @@ interface Props extends Actions {
 
 export function FileTree({ tree, activePath, ...actions }: Props) {
   if (tree.length === 0) {
-    return <p className="muted sidebar-empty">No Markdown files yet. Use ＋ to add one.</p>;
+    return <p className="muted sidebar-empty">No Markdown files yet. Use + to add one.</p>;
   }
   return (
     <ul className="tree">
@@ -65,7 +67,7 @@ function TreeItem({ node, depth, activePath, ...actions }: ItemProps) {
               aria-label={`New file in ${node.name}`}
               onClick={act(() => onNewFile(node.path))}
             >
-              ＋
+              <Icon icon={Add01Icon} size={15} />
             </button>
           </span>
         </div>
@@ -104,7 +106,7 @@ function TreeItem({ node, depth, activePath, ...actions }: ItemProps) {
             aria-label={`Rename ${node.name}`}
             onClick={act(() => onRename(node.path))}
           >
-            ✎
+            <Icon icon={PencilEdit02Icon} size={15} />
           </button>
           <button
             className="tree-action tree-action-danger"
@@ -112,7 +114,7 @@ function TreeItem({ node, depth, activePath, ...actions }: ItemProps) {
             aria-label={`Delete ${node.name}`}
             onClick={act(() => onDelete(node.path))}
           >
-            🗑
+            <Icon icon={Delete02Icon} size={15} />
           </button>
         </span>
       </div>

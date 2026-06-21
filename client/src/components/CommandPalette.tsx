@@ -5,6 +5,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from './Icon';
+import { Search01Icon } from '@hugeicons/core-free-icons';
 
 interface Props {
   files: string[];
@@ -97,14 +99,17 @@ export function CommandPalette({ files, onOpen, onClose }: Props) {
         aria-label="Quick open"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <input
-          ref={inputRef}
-          className="palette-input"
-          placeholder="Go to file…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={onKeyDown}
-        />
+        <div className="palette-input-row">
+          <Icon icon={Search01Icon} size={18} />
+          <input
+            ref={inputRef}
+            className="palette-input"
+            placeholder="Go to file…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onKeyDown}
+          />
+        </div>
         <ul className="palette-list">
           {results.length === 0 && <li className="palette-empty">No matching files</li>}
           {results.map((path, i) => (
