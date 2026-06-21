@@ -1,10 +1,11 @@
 /**
- * Appearance settings popover: theme picker + reading/mono font choosers.
- * Pure UI — it reports changes upward; persistence and application live in
- * `settings.ts`. Closes on outside click or Escape.
+ * Appearance settings as a floating window: theme picker + reading/mono font
+ * choosers, centered over a dim backdrop. Pure UI — it reports changes upward;
+ * persistence and application live in `settings.ts`. Closes on backdrop click,
+ * the ✕ button, or Escape.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   THEMES,
   READING_FONTS,
@@ -34,28 +35,31 @@ export function SettingsPanel({
   onSidebar,
   onClose,
 }: Props) {
-  const ref = useRef<HTMLDivElement | null>(null);
-
   useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   return (
-    <div className="settings-panel" ref={ref} role="dialog" aria-label="Appearance">
-      <h2 className="settings-title">Appearance</h2>
-
-      <section className="settings-section">
+    <div className="settings-backdrop" onMouseDown={onClose}>
+      <div
+        className="settings-window"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Appearance"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="settings-window-head">
+          <h2 className="settings-title">Appearance</h2>
+          <button className="btn icon-btn" aria-label="Close settings" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        <div className="settings-window-body">
+          <section className="settings-section">
         <span className="settings-heading">Theme</span>
         <div className="theme-grid">
           {THEMES.map((t) => (
@@ -103,7 +107,9 @@ export function SettingsPanel({
           Auto-hide — reveal on hover at the left edge
         </label>
         <p className="setting-hint">Toggle the sidebar anytime with the ☰ button or Ctrl/Cmd-B.</p>
-      </section>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

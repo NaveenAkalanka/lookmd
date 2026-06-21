@@ -454,36 +454,36 @@ export function App() {
     ? `${workspace?.root ?? ''}::${activeTab.path}#${activeTab.reloadNonce}`
     : '';
 
-  const settingsControl = (
-    <span className="settings-anchor">
-      <button
-        className="btn icon-btn"
-        title="Appearance"
-        aria-label="Appearance settings"
-        aria-expanded={settingsOpen}
-        onClick={() => setSettingsOpen((o) => !o)}
-      >
-        ⚙
-      </button>
-      {settingsOpen && (
-        <SettingsPanel
-          theme={theme}
-          fonts={fonts}
-          sidebar={sidebar}
-          onTheme={changeTheme}
-          onFonts={changeFonts}
-          onSidebar={changeSidebar}
-          onClose={() => setSettingsOpen(false)}
-        />
-      )}
-    </span>
+  const settingsButton = (
+    <button
+      className="btn icon-btn"
+      title="Appearance"
+      aria-label="Appearance settings"
+      aria-haspopup="dialog"
+      aria-expanded={settingsOpen}
+      onClick={() => setSettingsOpen((o) => !o)}
+    >
+      ⚙
+    </button>
+  );
+  const settingsModal = settingsOpen && (
+    <SettingsPanel
+      theme={theme}
+      fonts={fonts}
+      sidebar={sidebar}
+      onTheme={changeTheme}
+      onFonts={changeFonts}
+      onSidebar={changeSidebar}
+      onClose={() => setSettingsOpen(false)}
+    />
   );
 
   if (!workspace) {
     return (
       <div className="picker-shell">
-        <div className="settings-corner">{settingsControl}</div>
+        <div className="settings-corner">{settingsButton}</div>
         <WorkspacePicker onOpen={(ws, src) => switchWorkspace(ws, src)} />
+        {settingsModal}
       </div>
     );
   }
@@ -507,7 +507,7 @@ export function App() {
         <button className="btn" onClick={() => switchWorkspace(null)}>
           Change workspace
         </button>
-        {settingsControl}
+        {settingsButton}
       </header>
 
       <div
@@ -676,6 +676,8 @@ export function App() {
           </div>
         </main>
       </div>
+
+      {settingsModal}
     </div>
   );
 }
