@@ -1,18 +1,32 @@
 /**
  * localStorage-backed persistence: recent workspaces and the last-active one.
- * Per CLAUDE.md this is the only browser persistence — no cookies, no IndexedDB.
- * All access is guarded so a disabled/again full storage never crashes the app.
+ * This holds only JSON-able descriptors. The one non-localStorage exception is
+ * the IndexedDB handle store (see sources/handles.ts), which remembers the
+ * granted folder for File System Access workspaces — see CLAUDE.md.
+ * All access is guarded so a disabled/full storage never crashes the app.
  */
+
+import type { SourceKind } from './sources/types';
 
 const RECENTS_KEY = 'lookmd.recents';
 const LAST_KEY = 'lookmd.lastWorkspace';
 const MAX_RECENTS = 8;
 
 export interface Workspace {
-  /** POSIX path of the workspace root, relative to BASE ('' === BASE itself). */
+  /** Which file source backs this workspace. */
+  kind: SourceKind;
+  /**
+   * REST: POSIX path of the root relative to BASE ('' === BASE itself).
+   * FSA: an opaque id keying the directory handle in IndexedDB.
+   */
   root: string;
   /** Display label. */
   name: string;
+}
+
+/** Older records predate `kind`; treat them as REST. */
+function normalize(ws: Workspace): Workspace {
+  return { kind: ws.kind ?? 'rest', root: ws.root, name: ws.name };
 }
 
 export interface RecentWorkspace extends Workspace {
@@ -44,19 +58,20 @@ function write(key: string, value: unknown): void {
 
 export function getRecents(): RecentWorkspace[] {
   const list = read<RecentWorkspace[]>(RECENTS_KEY, []);
-  return Array.isArray(list) ? list : [];
+  return Array.isArray(list) ? list.map((r) => ({ ...normalize(r), openedAt: r.openedAt })) : [];
 }
 
 export function addRecent(ws: Workspace): void {
   const next: RecentWorkspace[] = [
     { ...ws, openedAt: Date.now() },
-    ...getRecents().filter((r) => r.root !== ws.root),
+    ...getRecents().filter((r) => !(r.kind === ws.kind && r.root === ws.root)),
   ].slice(0, MAX_RECENTS);
   write(RECENTS_KEY, next);
 }
 
 export function getLastWorkspace(): Workspace | null {
-  return read<Workspace | null>(LAST_KEY, null);
+  const ws = read<Workspace | null>(LAST_KEY, null);
+  return ws ? normalize(ws) : null;
 }
 
 export function setLastWorkspace(ws: Workspace | null): void {

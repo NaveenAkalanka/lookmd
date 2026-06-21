@@ -1,12 +1,26 @@
 /**
- * Welcome / empty state. Lets you reopen a recent workspace or browse BASE for
- * a folder to open as the active workspace. Browsing stays scoped to BASE — the
- * backend rejects anything that escapes it.
+ * Welcome / empty state. Three ways in:
+ *  - reopen a recent workspace (REST path or a remembered local folder);
+ *  - browse the server BASE for a folder (REST; scoped to BASE by the backend);
+ *  - open a local folder directly via the File System Access API (no server),
+ *    shown only where the browser supports it.
+ *
+ * The picker builds the matching FileSource and hands it to `onOpen`, so the app
+ * shell stays agnostic about where a workspace's bytes come from.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import type { FolderEntry } from '@lookmd/shared';
 import { api, ApiRequestError } from '../api';
+import { createRestSource } from '../sources/rest';
+import {
+  createFsaSource,
+  fsaSupported,
+  pickDirectory,
+  ensurePermission,
+} from '../sources/fsa';
+import { getHandle, putHandle } from '../sources/handles';
+import type { FileSource } from '../sources/types';
 import {
   getRecents,
   workspaceName,
@@ -15,7 +29,7 @@ import {
 } from '../storage';
 
 interface Props {
-  onOpen: (ws: Workspace) => void;
+  onOpen: (ws: Workspace, source: FileSource) => void;
 }
 
 export function WorkspacePicker({ onOpen }: Props) {
@@ -46,21 +60,85 @@ export function WorkspacePicker({ onOpen }: Props) {
     browse('');
   }, [browse]);
 
+  // Reopen a recent: rebuild the right source. FSA needs its handle back from
+  // IndexedDB plus a (re-)granted permission, which the click gesture allows.
+  const openRecent = useCallback(
+    async (r: RecentWorkspace) => {
+      setError(null);
+      if (r.kind === 'fsa') {
+        try {
+          const rec = await getHandle(r.root);
+          if (!rec) {
+            setError('That local folder is no longer remembered — open it again below.');
+            return;
+          }
+          if (!(await ensurePermission(rec.handle))) {
+            setError('Permission to that folder was denied.');
+            return;
+          }
+          onOpen({ kind: 'fsa', root: r.root, name: r.name }, createFsaSource(rec.handle));
+        } catch {
+          setError('Could not reopen that local folder.');
+        }
+      } else {
+        onOpen({ kind: 'rest', root: r.root, name: r.name }, createRestSource(r.root));
+      }
+    },
+    [onOpen],
+  );
+
+  const openLocal = useCallback(async () => {
+    setError(null);
+    try {
+      const handle = await pickDirectory();
+      const id = crypto.randomUUID();
+      await putHandle({ id, name: handle.name, handle });
+      onOpen({ kind: 'fsa', root: id, name: handle.name }, createFsaSource(handle));
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return; // cancelled
+      setError(err instanceof ApiRequestError ? err.message : 'Could not open the folder.');
+    }
+  }, [onOpen]);
+
+  const openRestFolder = useCallback(() => {
+    onOpen({ kind: 'rest', root: path, name: workspaceName(path) }, createRestSource(path));
+  }, [onOpen, path]);
+
   return (
     <div className="picker">
       <div className="picker-card">
         <h1 className="picker-title">lookmd</h1>
         <p className="picker-subtitle">Open a folder to start reading and editing Markdown.</p>
 
+        {error && <p className="error">{error}</p>}
+
+        {fsaSupported && (
+          <section className="picker-section">
+            <h2 className="picker-heading">This computer</h2>
+            <button className="btn btn-accent" onClick={() => void openLocal()}>
+              Open a local folder…
+            </button>
+            <p className="picker-hint muted">
+              Opens a folder on this device directly in the browser — works even when
+              lookmd is hosted elsewhere. (Chromium browsers only.)
+            </p>
+          </section>
+        )}
+
         {recents.length > 0 && (
           <section className="picker-section">
             <h2 className="picker-heading">Recent</h2>
             <ul className="picker-list">
               {recents.map((r) => (
-                <li key={r.root}>
-                  <button className="picker-item" onClick={() => onOpen({ root: r.root, name: r.name })}>
-                    <span className="picker-item-name">{r.name}</span>
-                    <span className="picker-item-path">{r.root || '/'}</span>
+                <li key={`${r.kind}:${r.root}`}>
+                  <button className="picker-item" onClick={() => void openRecent(r)}>
+                    <span className="picker-item-name">
+                      {r.kind === 'fsa' ? '💻 ' : ''}
+                      {r.name}
+                    </span>
+                    <span className="picker-item-path">
+                      {r.kind === 'fsa' ? 'local folder' : r.root || '/'}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -69,7 +147,7 @@ export function WorkspacePicker({ onOpen }: Props) {
         )}
 
         <section className="picker-section">
-          <h2 className="picker-heading">Browse</h2>
+          <h2 className="picker-heading">Browse the server</h2>
           <div className="picker-breadcrumb">
             <code>/{path}</code>
             <button
@@ -79,14 +157,13 @@ export function WorkspacePicker({ onOpen }: Props) {
             >
               ↑ Up
             </button>
-            <button className="btn btn-accent" onClick={() => onOpen({ root: path, name: workspaceName(path) })}>
+            <button className="btn btn-accent" onClick={openRestFolder}>
               Open this folder
             </button>
           </div>
 
-          {error && <p className="error">{error}</p>}
           {loading && <p className="muted">Loading…</p>}
-          {!loading && !error && folders.length === 0 && (
+          {!loading && folders.length === 0 && (
             <p className="muted">No sub-folders here. You can open this folder.</p>
           )}
 

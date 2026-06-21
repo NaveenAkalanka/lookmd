@@ -9,6 +9,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import type { TreeNode, GetFileResponse } from '@lookmd/shared';
 import { ApiRequestError } from './api';
 import { createRestSource } from './sources/rest';
+import type { FileSource } from './sources/types';
 import {
   addRecent,
   getLastWorkspace,
@@ -41,7 +42,12 @@ function ensureTextExt(name: string): string {
 }
 
 export function App() {
-  const [workspace, setWorkspace] = useState<Workspace | null>(() => getLastWorkspace());
+  const [workspace, setWorkspace] = useState<Workspace | null>(() => {
+    const last = getLastWorkspace();
+    // FSA workspaces need a user gesture to re-grant permission, so they can't
+    // be auto-restored — only reopen REST ones; FSA recents wait in the picker.
+    return last && last.kind === 'rest' ? last : null;
+  });
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [treeError, setTreeError] = useState<string | null>(null);
   const [treeLoading, setTreeLoading] = useState(false);
@@ -78,10 +84,10 @@ export function App() {
 
   const dirty = file !== null && draft !== file.content;
 
-  // The active workspace's file source. Today always REST; FSA plugs in here.
-  const source = useMemo(
-    () => (workspace ? createRestSource(workspace.root) : null),
-    [workspace],
+  // The active workspace's file source, set by whoever opened it. REST sources
+  // can be rebuilt synchronously on restore; FSA ones arrive via the picker.
+  const [source, setSource] = useState<FileSource | null>(() =>
+    workspace ? createRestSource(workspace.root) : null,
   );
 
   const loadTree = useCallback(async () => {
@@ -116,7 +122,7 @@ export function App() {
   }, [dirty]);
 
   const switchWorkspace = useCallback(
-    (ws: Workspace | null) => {
+    (ws: Workspace | null, src: FileSource | null = null) => {
       if (dirty && !window.confirm('You have unsaved changes. Discard them?')) return;
       setOpenPath(null);
       setFile(null);
@@ -124,12 +130,14 @@ export function App() {
       setFileError(null);
       setConflict(false);
       setSaveError(null);
-      if (ws) {
+      if (ws && src) {
         setWorkspace(ws);
+        setSource(src);
         setLastWorkspace(ws);
         addRecent(ws);
       } else {
         setWorkspace(null);
+        setSource(null);
       }
     },
     [dirty],
@@ -329,7 +337,7 @@ export function App() {
     return (
       <div className="picker-shell">
         <div className="settings-corner">{settingsControl}</div>
-        <WorkspacePicker onOpen={(ws) => switchWorkspace(ws)} />
+        <WorkspacePicker onOpen={(ws, src) => switchWorkspace(ws, src)} />
       </div>
     );
   }

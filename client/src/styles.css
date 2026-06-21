@@ -557,6 +557,11 @@ body {
   color: var(--text-tertiary);
   margin: 0 0 8px;
 }
+.picker-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
 .picker-list {
   list-style: none;
   margin: 0;
