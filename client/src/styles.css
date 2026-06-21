@@ -291,8 +291,26 @@ body {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 12px;
+  width: 14px;
   z-index: 15;
+  cursor: pointer;
+}
+/* A faint edge sliver hints where to hover to bring the sidebar back. */
+.sidebar-reveal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  background: var(--border);
+  opacity: 0.6;
+  transition: opacity 0.15s ease, width 0.15s ease;
+}
+.sidebar-reveal:hover::before {
+  width: 4px;
+  opacity: 1;
+  background: var(--accent);
 }
 .sidebar-empty {
   padding: 12px;
@@ -719,6 +737,10 @@ body {
 }
 .tree-action-danger:hover {
   color: var(--danger);
+}
+.tree-action[aria-pressed='true'] {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .tree-twisty {
   width: 12px;

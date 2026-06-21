@@ -5,7 +5,7 @@
  * header + file-tree sidebar + content pane.
  */
 
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TreeNode, GetFileResponse } from '@lookmd/shared';
 import { ApiRequestError } from './api';
 import { createRestSource } from './sources/rest';
@@ -105,6 +105,30 @@ export function App() {
     if (sidebar.autoHide) setPeek((p) => !p);
     else changeSidebar({ ...sidebar, collapsed: !sidebar.collapsed });
   }, [sidebar, changeSidebar]);
+
+  // Hover-intent for auto-hide: reveal instantly, but wait a grace period before
+  // hiding so a brief stray movement off the panel doesn't snap it shut. Moving
+  // back in cancels the pending hide.
+  const hideTimer = useRef<number | null>(null);
+  const cancelHide = useCallback(() => {
+    if (hideTimer.current !== null) {
+      window.clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+  }, []);
+  const revealSidebar = useCallback(() => {
+    cancelHide();
+    setPeek(true);
+  }, [cancelHide]);
+  const scheduleHide = useCallback(() => {
+    cancelHide();
+    hideTimer.current = window.setTimeout(() => {
+      setPeek(false);
+      hideTimer.current = null;
+    }, 600);
+  }, [cancelHide]);
+  // Clear any pending timer on unmount.
+  useEffect(() => cancelHide, [cancelHide]);
 
   const dirty = file !== null && draft !== file.content;
 
@@ -413,18 +437,30 @@ export function App() {
         {sidebar.autoHide && !sidebarVisible && (
           <div
             className="sidebar-reveal"
-            onMouseEnter={() => setPeek(true)}
+            onMouseEnter={revealSidebar}
             aria-hidden="true"
           />
         )}
         <aside
           className="sidebar"
+          onMouseEnter={() => {
+            if (sidebar.autoHide) cancelHide();
+          }}
           onMouseLeave={() => {
-            if (sidebar.autoHide) setPeek(false);
+            if (sidebar.autoHide) scheduleHide();
           }}
         >
           <div className="sidebar-head">
             <span className="sidebar-head-label">Files</span>
+            <button
+              className="tree-action"
+              title={sidebar.autoHide ? 'Pin sidebar (turn off auto-hide)' : 'Auto-hide sidebar'}
+              aria-label="Toggle sidebar auto-hide"
+              aria-pressed={sidebar.autoHide}
+              onClick={() => changeSidebar({ ...sidebar, autoHide: !sidebar.autoHide })}
+            >
+              📌
+            </button>
             <button
               className="tree-action"
               title="New file in workspace root"
