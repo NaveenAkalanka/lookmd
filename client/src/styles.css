@@ -256,6 +256,43 @@ body {
   border-right: 1px solid var(--border);
   overflow: auto;
   padding: 6px 0;
+  transition: width 0.18s ease, transform 0.18s ease;
+}
+
+/* Manual collapse (pinned mode): the sidebar leaves the layout and the content
+ * reflows to full width. */
+.body.sidebar-hidden:not(.body-autohide) .sidebar {
+  width: 0;
+  padding: 0;
+  border-right: none;
+  overflow: hidden;
+}
+
+/* Auto-hide: the sidebar floats over the content as an overlay, slid off-screen
+ * until revealed. A thin strip on the left edge brings it back on hover. */
+.body-autohide {
+  position: relative;
+}
+.body-autohide .sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  transform: translateX(0);
+  box-shadow: 2px 0 14px rgba(0, 0, 0, 0.22);
+}
+.body-autohide.sidebar-hidden .sidebar {
+  transform: translateX(-100%);
+  box-shadow: none;
+}
+.sidebar-reveal {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 12px;
+  z-index: 15;
 }
 .sidebar-empty {
   padding: 12px;
@@ -607,6 +644,22 @@ body {
 .setting-control:focus {
   outline: none;
   border-color: var(--accent);
+}
+.setting-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.setting-check input {
+  accent-color: var(--accent);
+}
+.setting-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
 /* --- File tree ----------------------------------------------------------- */

@@ -35,10 +35,13 @@ import { SettingsPanel } from './components/SettingsPanel';
 import {
   getTheme,
   getFonts,
+  getSidebar,
   setTheme as persistTheme,
   setFonts as persistFonts,
+  setSidebar as persistSidebar,
   type ThemeId,
   type Fonts,
+  type SidebarPref,
 } from './settings';
 
 /** Default a bare name to `.md` so it passes the backend's text allowlist. */
@@ -79,6 +82,12 @@ export function App() {
   const [fonts, setFonts] = useState<Fonts>(() => getFonts());
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Sidebar: a persisted pref (manual collapse + auto-hide) plus a transient
+  // `peek` for the hover-reveal used in auto-hide mode.
+  const [sidebar, setSidebarState] = useState<SidebarPref>(() => getSidebar());
+  const [peek, setPeek] = useState(false);
+  const sidebarVisible = sidebar.autoHide ? peek : !sidebar.collapsed;
+
   const changeTheme = useCallback((t: ThemeId) => {
     setTheme(t);
     persistTheme(t);
@@ -87,6 +96,15 @@ export function App() {
     setFonts(f);
     persistFonts(f);
   }, []);
+  const changeSidebar = useCallback((s: SidebarPref) => {
+    setSidebarState(s);
+    persistSidebar(s);
+    if (s.autoHide) setPeek(false); // start hidden when auto-hide turns on
+  }, []);
+  const toggleSidebar = useCallback(() => {
+    if (sidebar.autoHide) setPeek((p) => !p);
+    else changeSidebar({ ...sidebar, collapsed: !sidebar.collapsed });
+  }, [sidebar, changeSidebar]);
 
   const dirty = file !== null && draft !== file.content;
 
@@ -154,6 +172,7 @@ export function App() {
       if (!source) return;
       if (path === openPath) return;
       if (dirty && !window.confirm('You have unsaved changes. Discard them?')) return;
+      setPeek(false); // collapse the auto-hide overlay once a file is chosen
       setOpenPath(path);
       setFile(null);
       setDraft('');
@@ -207,6 +226,18 @@ export function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [save]);
+
+  // Ctrl/Cmd-B toggles the sidebar (collapse in pinned mode, peek in auto-hide).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [toggleSidebar]);
 
   // Conflict resolution: discard local edits and re-read from disk.
   const discardAndReload = useCallback(async () => {
@@ -331,8 +362,10 @@ export function App() {
         <SettingsPanel
           theme={theme}
           fonts={fonts}
+          sidebar={sidebar}
           onTheme={changeTheme}
           onFonts={changeFonts}
+          onSidebar={changeSidebar}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -353,6 +386,15 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
+        <button
+          className="btn icon-btn"
+          title="Toggle sidebar (Ctrl/Cmd-B)"
+          aria-label="Toggle sidebar"
+          aria-expanded={sidebarVisible}
+          onClick={toggleSidebar}
+        >
+          ☰
+        </button>
         <span className="brand">lookmd</span>
         <span className="workspace-name" title={workspace.root || '/'}>
           {workspace.name}
@@ -363,8 +405,24 @@ export function App() {
         {settingsControl}
       </header>
 
-      <div className="body">
-        <aside className="sidebar">
+      <div
+        className={`body${sidebar.autoHide ? ' body-autohide' : ''}${
+          sidebarVisible ? '' : ' sidebar-hidden'
+        }`}
+      >
+        {sidebar.autoHide && !sidebarVisible && (
+          <div
+            className="sidebar-reveal"
+            onMouseEnter={() => setPeek(true)}
+            aria-hidden="true"
+          />
+        )}
+        <aside
+          className="sidebar"
+          onMouseLeave={() => {
+            if (sidebar.autoHide) setPeek(false);
+          }}
+        >
           <div className="sidebar-head">
             <span className="sidebar-head-label">Files</span>
             <button

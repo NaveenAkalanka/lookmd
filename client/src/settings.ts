@@ -9,6 +9,7 @@
 
 const THEME_KEY = 'lookmd.theme';
 const FONTS_KEY = 'lookmd.fonts';
+const SIDEBAR_KEY = 'lookmd.sidebar';
 
 export type ThemeId = 'paper' | 'daylight' | 'slate' | 'sanctum';
 
@@ -51,6 +52,16 @@ export const MONO_FONTS: FontOption[] = [
   { label: 'JetBrains / Fira', value: "'JetBrains Mono', 'Fira Code', monospace" },
 ];
 
+export interface SidebarPref {
+  /** Manual collapse state, used when not auto-hiding. */
+  collapsed: boolean;
+  /** When true the sidebar floats as an overlay, revealed on hover at the edge
+   *  and hidden again after you open a file. */
+  autoHide: boolean;
+}
+
+export const DEFAULT_SIDEBAR: SidebarPref = { collapsed: false, autoHide: false };
+
 function readRaw(key: string): string | null {
   try {
     return localStorage.getItem(key);
@@ -84,6 +95,24 @@ export function getFonts(): Fonts {
   } catch {
     return { ...DEFAULT_FONTS };
   }
+}
+
+export function getSidebar(): SidebarPref {
+  const raw = readRaw(SIDEBAR_KEY);
+  if (!raw) return { ...DEFAULT_SIDEBAR };
+  try {
+    const parsed = JSON.parse(raw) as Partial<SidebarPref>;
+    return {
+      collapsed: typeof parsed.collapsed === 'boolean' ? parsed.collapsed : false,
+      autoHide: typeof parsed.autoHide === 'boolean' ? parsed.autoHide : false,
+    };
+  } catch {
+    return { ...DEFAULT_SIDEBAR };
+  }
+}
+
+export function setSidebar(pref: SidebarPref): void {
+  writeRaw(SIDEBAR_KEY, JSON.stringify(pref));
 }
 
 export function applyTheme(theme: ThemeId): void {

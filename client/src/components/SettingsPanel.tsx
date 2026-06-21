@@ -12,17 +12,28 @@ import {
   type ThemeId,
   type Fonts,
   type FontOption,
+  type SidebarPref,
 } from '../settings';
 
 interface Props {
   theme: ThemeId;
   fonts: Fonts;
+  sidebar: SidebarPref;
   onTheme: (theme: ThemeId) => void;
   onFonts: (fonts: Fonts) => void;
+  onSidebar: (sidebar: SidebarPref) => void;
   onClose: () => void;
 }
 
-export function SettingsPanel({ theme, fonts, onTheme, onFonts, onClose }: Props) {
+export function SettingsPanel({
+  theme,
+  fonts,
+  sidebar,
+  onTheme,
+  onFonts,
+  onSidebar,
+  onClose,
+}: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -79,6 +90,19 @@ export function SettingsPanel({ theme, fonts, onTheme, onFonts, onClose }: Props
           options={MONO_FONTS}
           onChange={(mono) => onFonts({ ...fonts, mono })}
         />
+      </section>
+
+      <section className="settings-section">
+        <span className="settings-heading">Sidebar</span>
+        <label className="setting-check">
+          <input
+            type="checkbox"
+            checked={sidebar.autoHide}
+            onChange={(e) => onSidebar({ ...sidebar, autoHide: e.target.checked })}
+          />
+          Auto-hide — reveal on hover at the left edge
+        </label>
+        <p className="setting-hint">Toggle the sidebar anytime with the ☰ button or Ctrl/Cmd-B.</p>
       </section>
     </div>
   );
