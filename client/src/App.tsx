@@ -7,7 +7,8 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type { TreeNode, GetFileResponse } from '@lookmd/shared';
-import { api, ApiRequestError } from './api';
+import { ApiRequestError } from './api';
+import { createRestSource } from './sources/rest';
 import {
   addRecent,
   getLastWorkspace,
@@ -77,19 +78,25 @@ export function App() {
 
   const dirty = file !== null && draft !== file.content;
 
+  // The active workspace's file source. Today always REST; FSA plugs in here.
+  const source = useMemo(
+    () => (workspace ? createRestSource(workspace.root) : null),
+    [workspace],
+  );
+
   const loadTree = useCallback(async () => {
-    if (!workspace) return;
+    if (!source) return;
     setTreeLoading(true);
     setTreeError(null);
     try {
-      const res = await api.tree(workspace.root);
-      setTree(res.tree);
+      const nodes = await source.tree();
+      setTree(nodes);
     } catch (err) {
       setTreeError(err instanceof ApiRequestError ? err.message : 'failed to load workspace');
     } finally {
       setTreeLoading(false);
     }
-  }, [workspace]);
+  }, [source]);
 
   // (Re)load the tree whenever the workspace changes.
   useEffect(() => {
@@ -130,7 +137,7 @@ export function App() {
 
   const openFile = useCallback(
     (path: string) => {
-      if (!workspace) return;
+      if (!source) return;
       if (path === openPath) return;
       if (dirty && !window.confirm('You have unsaved changes. Discard them?')) return;
       setOpenPath(path);
@@ -140,8 +147,8 @@ export function App() {
       setSaveError(null);
       setConflict(false);
       setFileLoading(true);
-      api
-        .file(workspace.root, path)
+      source
+        .file(path)
         .then((res) => {
           setFile(res);
           setDraft(res.content);
@@ -151,22 +158,17 @@ export function App() {
         })
         .finally(() => setFileLoading(false));
     },
-    [workspace, openPath, dirty],
+    [source, openPath, dirty],
   );
 
   const save = useCallback(async () => {
-    if (!workspace || !file || !openPath || saving) return;
+    if (!source || !file || !openPath || saving) return;
     if (draft === file.content) return; // nothing to save
     setSaving(true);
     setSaveError(null);
     setConflict(false);
     try {
-      const res = await api.save({
-        root: workspace.root,
-        path: openPath,
-        content: draft,
-        baseHash: file.hash,
-      });
+      const res = await source.save(openPath, draft, file.hash);
       setFile({ path: openPath, content: draft, hash: res.hash });
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === 'CONFLICT') {
@@ -177,7 +179,7 @@ export function App() {
     } finally {
       setSaving(false);
     }
-  }, [workspace, file, openPath, draft, saving]);
+  }, [source, file, openPath, draft, saving]);
 
   // Global Ctrl/Cmd-S so saving works in any mode (and never triggers the
   // browser's own save dialog).
@@ -194,9 +196,9 @@ export function App() {
 
   // Conflict resolution: discard local edits and re-read from disk.
   const discardAndReload = useCallback(async () => {
-    if (!workspace || !openPath) return;
+    if (!source || !openPath) return;
     try {
-      const fresh = await api.file(workspace.root, openPath);
+      const fresh = await source.file(openPath);
       setFile(fresh);
       setDraft(fresh.content);
       setConflict(false);
@@ -205,21 +207,16 @@ export function App() {
     } catch (err) {
       setSaveError(err instanceof ApiRequestError ? err.message : 'reload failed');
     }
-  }, [workspace, openPath]);
+  }, [source, openPath]);
 
   // Conflict resolution: keep local edits and overwrite, re-reading only to get
   // the current hash so the second save passes the check.
   const overwrite = useCallback(async () => {
-    if (!workspace || !openPath) return;
+    if (!source || !openPath) return;
     setSaving(true);
     try {
-      const fresh = await api.file(workspace.root, openPath);
-      const res = await api.save({
-        root: workspace.root,
-        path: openPath,
-        content: draft,
-        baseHash: fresh.hash,
-      });
+      const fresh = await source.file(openPath);
+      const res = await source.save(openPath, draft, fresh.hash);
       setFile({ path: openPath, content: draft, hash: res.hash });
       setConflict(false);
       setSaveError(null);
@@ -228,7 +225,7 @@ export function App() {
     } finally {
       setSaving(false);
     }
-  }, [workspace, openPath, draft]);
+  }, [source, openPath, draft]);
 
   // --- Tree actions (create / rename / delete) ---------------------------
   // The backend only operates on text files (and refuses to move/delete dirs),
@@ -236,7 +233,7 @@ export function App() {
 
   const newFile = useCallback(
     async (dir: string) => {
-      if (!workspace) return;
+      if (!source) return;
       const input = window.prompt(`New file name${dir ? ` in ${dir}/` : ''}:`, 'untitled.md');
       if (input === null) return;
       const name = ensureTextExt(input.trim());
@@ -244,19 +241,19 @@ export function App() {
       const path = dir ? `${dir}/${name}` : name;
       setActionError(null);
       try {
-        await api.create({ root: workspace.root, path });
+        await source.create(path);
         await loadTree();
         openFile(path);
       } catch (err) {
         setActionError(err instanceof ApiRequestError ? err.message : 'could not create file');
       }
     },
-    [workspace, loadTree, openFile],
+    [source, loadTree, openFile],
   );
 
   const renameFile = useCallback(
     async (path: string) => {
-      if (!workspace) return;
+      if (!source) return;
       const base = path.split('/').pop() ?? path;
       const input = window.prompt('Rename file to:', base);
       if (input === null) return;
@@ -266,7 +263,7 @@ export function App() {
       const to = slash >= 0 ? `${path.slice(0, slash)}/${newName}` : newName;
       setActionError(null);
       try {
-        await api.move({ root: workspace.root, from: path, to });
+        await source.move(path, to);
         if (openPath === path) {
           setOpenPath(to);
           setFile((f) => (f ? { ...f, path: to } : f));
@@ -276,16 +273,16 @@ export function App() {
         setActionError(err instanceof ApiRequestError ? err.message : 'could not rename file');
       }
     },
-    [workspace, openPath, loadTree],
+    [source, openPath, loadTree],
   );
 
   const deleteFile = useCallback(
     async (path: string) => {
-      if (!workspace) return;
+      if (!source) return;
       if (!window.confirm(`Delete "${path}"?\n\nThis cannot be undone.`)) return;
       setActionError(null);
       try {
-        await api.remove({ root: workspace.root, path });
+        await source.remove(path);
         if (openPath === path) {
           setOpenPath(null);
           setFile(null);
@@ -297,7 +294,7 @@ export function App() {
         setActionError(err instanceof ApiRequestError ? err.message : 'could not delete file');
       }
     },
-    [workspace, openPath, loadTree],
+    [source, openPath, loadTree],
   );
 
   const docKey = useMemo(
