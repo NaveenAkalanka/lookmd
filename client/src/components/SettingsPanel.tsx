@@ -20,9 +20,11 @@ interface Props {
   theme: ThemeId;
   fonts: Fonts;
   sidebar: SidebarPref;
+  lineNumbers: boolean;
   onTheme: (theme: ThemeId) => void;
   onFonts: (fonts: Fonts) => void;
   onSidebar: (sidebar: SidebarPref) => void;
+  onLineNumbers: (on: boolean) => void;
   onClose: () => void;
 }
 
@@ -30,9 +32,11 @@ export function SettingsPanel({
   theme,
   fonts,
   sidebar,
+  lineNumbers,
   onTheme,
   onFonts,
   onSidebar,
+  onLineNumbers,
   onClose,
 }: Props) {
   useEffect(() => {
@@ -107,6 +111,18 @@ export function SettingsPanel({
           Auto-hide — reveal on hover at the left edge
         </label>
         <p className="setting-hint">Toggle the sidebar anytime with the ☰ button or Ctrl/Cmd-B.</p>
+          </section>
+
+          <section className="settings-section">
+            <span className="settings-heading">Editor</span>
+            <label className="setting-check">
+              <input
+                type="checkbox"
+                checked={lineNumbers}
+                onChange={(e) => onLineNumbers(e.target.checked)}
+              />
+              Show line numbers (Source &amp; Edit)
+            </label>
           </section>
         </div>
       </div>

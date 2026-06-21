@@ -40,9 +40,11 @@ import {
   getTheme,
   getFonts,
   getSidebar,
+  getLineNumbers,
   setTheme as persistTheme,
   setFonts as persistFonts,
   setSidebar as persistSidebar,
+  setLineNumbers as persistLineNumbers,
   type ThemeId,
   type Fonts,
   type SidebarPref,
@@ -156,6 +158,7 @@ export function App() {
   // Sidebar: a persisted pref (manual collapse + auto-hide) plus a transient
   // `peek` for the hover-reveal used in auto-hide mode.
   const [sidebar, setSidebarState] = useState<SidebarPref>(() => getSidebar());
+  const [lineNumbers, setLineNumbersState] = useState<boolean>(() => getLineNumbers());
   const [peek, setPeek] = useState(false);
   const sidebarVisible = sidebar.autoHide ? peek : !sidebar.collapsed;
 
@@ -178,6 +181,10 @@ export function App() {
     setSidebarState(s);
     persistSidebar(s);
     if (s.autoHide) setPeek(false); // start hidden when auto-hide turns on
+  }, []);
+  const changeLineNumbers = useCallback((on: boolean) => {
+    setLineNumbersState(on);
+    persistLineNumbers(on);
   }, []);
   const toggleSidebar = useCallback(() => {
     if (sidebar.autoHide) setPeek((p) => !p);
@@ -556,9 +563,11 @@ export function App() {
       theme={theme}
       fonts={fonts}
       sidebar={sidebar}
+      lineNumbers={lineNumbers}
       onTheme={changeTheme}
       onFonts={changeFonts}
       onSidebar={changeSidebar}
+      onLineNumbers={changeLineNumbers}
       onClose={() => setSettingsOpen(false)}
     />
   );
@@ -756,13 +765,16 @@ export function App() {
                     onNavigate={navigateLink}
                   />
                 )}
-                {mode === 'source' && <SourceView content={activeTab.draft} />}
+                {mode === 'source' && (
+                  <SourceView content={activeTab.draft} lineNumbers={lineNumbers} />
+                )}
                 {mode === 'edit' && (
                   <Editor
                     value={activeTab.draft}
                     docKey={docKey}
                     onChange={setActiveDraft}
                     onSave={() => void save()}
+                    lineNumbers={lineNumbers}
                   />
                 )}
                 {mode === 'split' && (
@@ -773,6 +785,7 @@ export function App() {
                         docKey={docKey}
                         onChange={setActiveDraft}
                         onSave={() => void save()}
+                        lineNumbers={lineNumbers}
                       />
                     </div>
                     <div className="split-pane split-preview">

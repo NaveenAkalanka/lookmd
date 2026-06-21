@@ -10,6 +10,7 @@
 const THEME_KEY = 'lookmd.theme';
 const FONTS_KEY = 'lookmd.fonts';
 const SIDEBAR_KEY = 'lookmd.sidebar';
+const LINE_NUMBERS_KEY = 'lookmd.lineNumbers';
 
 export type ThemeId = 'paper' | 'daylight' | 'slate' | 'sanctum';
 
@@ -113,6 +114,15 @@ export function getSidebar(): SidebarPref {
 
 export function setSidebar(pref: SidebarPref): void {
   writeRaw(SIDEBAR_KEY, JSON.stringify(pref));
+}
+
+/** Show line numbers in Source mode and the editor gutter. Defaults on. */
+export function getLineNumbers(): boolean {
+  return readRaw(LINE_NUMBERS_KEY) !== '0';
+}
+
+export function setLineNumbers(on: boolean): void {
+  writeRaw(LINE_NUMBERS_KEY, on ? '1' : '0');
 }
 
 export function applyTheme(theme: ThemeId): void {

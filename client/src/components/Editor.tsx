@@ -26,6 +26,8 @@ interface Props {
   onChange: (next: string) => void;
   /** Invoked on Ctrl/Cmd-S from inside the editor. */
   onSave: () => void;
+  /** Show the line-number gutter (default true). */
+  lineNumbers?: boolean;
 }
 
 /** A CodeMirror theme whose every value points at a lookmd CSS variable. */
@@ -92,7 +94,7 @@ const lookmdHighlightStyle = HighlightStyle.define([
   { tag: t.invalid, color: 'var(--danger)' },
 ]);
 
-export function Editor({ value, docKey, onChange, onSave }: Props) {
+export function Editor({ value, docKey, onChange, onSave, lineNumbers = true }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -163,5 +165,7 @@ export function Editor({ value, docKey, onChange, onSave }: Props) {
     });
   }, [docKey, value]);
 
-  return <div className="editor" ref={hostRef} />;
+  // basicSetup always renders the gutter; hide it with a class when disabled,
+  // so toggling never tears down the editor or resets the cursor.
+  return <div className={`editor${lineNumbers ? '' : ' editor-no-gutter'}`} ref={hostRef} />;
 }
