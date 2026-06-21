@@ -15,29 +15,59 @@ import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import rehypeSlug from 'rehype-slug';
+import { remarkWikiLink } from '../markdown/remarkWikiLink';
 
 interface Props {
   content: string;
   resolveImage?: (src: string) => Promise<string>;
+  /** Open an internal link (workspace-relative href) — e.g. another .md file. */
+  onNavigate?: (href: string) => void;
 }
 
-export function ReadView({ content, resolveImage }: Props) {
-  const components = useMemo<Components | undefined>(() => {
-    if (!resolveImage) return undefined;
+const remarkPlugins = [remarkGfm, remarkWikiLink];
+const rehypePlugins = [rehypeSlug, rehypeHighlight];
+
+function isExternalUrl(src: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('//');
+}
+
+export function ReadView({ content, resolveImage, onNavigate }: Props) {
+  const components = useMemo<Components>(() => {
     return {
-      img: ({ src, alt }) => (
-        <MarkdownImage src={typeof src === 'string' ? src : ''} alt={alt} resolve={resolveImage} />
-      ),
+      img: ({ src, alt }) =>
+        resolveImage ? (
+          <MarkdownImage src={typeof src === 'string' ? src : ''} alt={alt} resolve={resolveImage} />
+        ) : (
+          <img src={typeof src === 'string' ? src : ''} alt={alt ?? ''} />
+        ),
+      a: ({ href, children }) => {
+        const url = typeof href === 'string' ? href : '';
+        const external = isExternalUrl(url);
+        const anchor = url.startsWith('#');
+        const internal = !!url && !external && !anchor;
+        return (
+          <a
+            href={url || undefined}
+            className={internal ? 'internal-link' : undefined}
+            target={external ? '_blank' : undefined}
+            rel={external ? 'noopener noreferrer' : undefined}
+            onClick={(e) => {
+              if (!internal) return;
+              e.preventDefault();
+              onNavigate?.(url);
+            }}
+          >
+            {children}
+          </a>
+        );
+      },
     };
-  }, [resolveImage]);
+  }, [resolveImage, onNavigate]);
 
   return (
     <article className="read">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={components}
-      >
+      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
         {content}
       </ReactMarkdown>
     </article>

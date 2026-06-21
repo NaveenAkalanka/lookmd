@@ -1038,6 +1038,13 @@ body {
 .read a {
   color: var(--accent-2);
 }
+/* Internal links (other workspace files, wikilinks) read as a softer, dashed
+ * affordance to distinguish them from external links. */
+.read a.internal-link {
+  text-decoration-style: dashed;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
 .read code {
   font-family: var(--font-mono);
   font-size: 0.88em;

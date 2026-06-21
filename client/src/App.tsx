@@ -509,6 +509,26 @@ export function App() {
     [source, activeDir],
   );
 
+  // Follow an internal link from the Read view: resolve relative to the open
+  // file, falling back to a workspace-wide basename match (wiki-style), then
+  // open it in a tab.
+  const navigateLink = useCallback(
+    (href: string) => {
+      if (!source) return;
+      const clean = decodeURIComponent(href.split('#')[0]?.split('?')[0] ?? '');
+      if (!clean) return;
+      const joined = joinPath(activeDir, clean);
+      const files = flattenFiles(tree);
+      const wanted = (clean.split('/').pop() ?? clean).toLowerCase();
+      const target =
+        files.find((f) => f === joined) ??
+        files.find((f) => (f.split('/').pop() ?? '').toLowerCase() === wanted) ??
+        joined;
+      openFile(target);
+    },
+    [source, activeDir, tree, openFile],
+  );
+
   const settingsButton = (
     <button
       className="btn icon-btn"
@@ -717,7 +737,11 @@ export function App() {
             {activeTab && activeTab.content !== null && !activeTab.loading && !activeTab.error && (
               <Suspense fallback={<div className="placeholder">Loading…</div>}>
                 {mode === 'read' && (
-                  <ReadView content={activeTab.draft} resolveImage={resolveImage} />
+                  <ReadView
+                    content={activeTab.draft}
+                    resolveImage={resolveImage}
+                    onNavigate={navigateLink}
+                  />
                 )}
                 {mode === 'source' && <SourceView content={activeTab.draft} />}
                 {mode === 'edit' && (
