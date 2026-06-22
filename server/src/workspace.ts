@@ -15,6 +15,7 @@ import type {
   GetFileResponse,
   PutFileResponse,
   CreateFileResponse,
+  CreateFolderResponse,
   DeleteFileResponse,
   MoveResponse,
   TreeNode,
@@ -317,6 +318,29 @@ export async function createFile(
     path: toPosix(path.relative(rootAbs, targetAbs)),
     hash: hashContent(buf),
   };
+}
+
+/** POST /api/folder — create a new (empty) directory inside the workspace.
+ *  409 if it already exists. No extension allowlist (folders have no type), but
+ *  the same containment + symlink rules as files. */
+export async function createFolder(
+  base: string,
+  root: string,
+  relPath: string,
+): Promise<CreateFolderResponse> {
+  if (relPath.trim() === '') {
+    throw new HttpError(400, 'INVALID_PATH', 'path is required');
+  }
+  const resolved = resolveInRoot({ base, root, relPath });
+  assertNoSymlinkEscape(base, resolved.rootAbs);
+  assertNoSymlinkEscape(resolved.rootAbs, resolved.targetAbs);
+
+  if (fs.existsSync(resolved.targetAbs)) {
+    throw new HttpError(409, 'ALREADY_EXISTS', `folder already exists: ${relPath}`);
+  }
+  await fsp.mkdir(resolved.targetAbs, { recursive: true });
+
+  return { path: toPosix(path.relative(resolved.rootAbs, resolved.targetAbs)), created: true };
 }
 
 /** DELETE /api/file — remove a single file. Directories are refused. */

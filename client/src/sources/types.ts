@@ -16,6 +16,7 @@ import type {
   GetFileResponse,
   PutFileResponse,
   CreateFileResponse,
+  CreateFolderResponse,
   DeleteFileResponse,
   MoveResponse,
 } from '@lookmd/shared';
@@ -37,6 +38,8 @@ export interface FileSource {
   save(path: string, content: string, baseHash: string): Promise<PutFileResponse>;
   /** Create a new file (empty or from content); rejects if it already exists. */
   create(path: string, content?: string): Promise<CreateFileResponse>;
+  /** Create a new (empty) folder; rejects if it already exists. */
+  mkdir(path: string): Promise<CreateFolderResponse>;
   /** Delete a single file. */
   remove(path: string): Promise<DeleteFileResponse>;
   /** Rename / move a file within the same workspace. */

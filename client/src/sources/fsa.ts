@@ -234,6 +234,31 @@ export function createFsaSource(root: FileSystemDirectoryHandle): FileSource {
       }
     },
 
+    async mkdir(path) {
+      const parts = splitPath(path);
+      const name = parts.pop();
+      if (name === undefined) {
+        throw new ApiRequestError(400, 'INVALID_PATH', 'path is required');
+      }
+      try {
+        const parent = await dirFor(parts, true); // create intermediate dirs
+        let exists = true;
+        try {
+          await parent.getDirectoryHandle(name, { create: false });
+        } catch (e) {
+          if (isNotFound(e)) exists = false;
+          else throw e;
+        }
+        if (exists) {
+          throw new ApiRequestError(409, 'ALREADY_EXISTS', `folder already exists: ${path}`);
+        }
+        await parent.getDirectoryHandle(name, { create: true });
+        return { path, created: true };
+      } catch (e) {
+        mapError(e);
+      }
+    },
+
     async remove(path) {
       assertAllowed(path);
       const { parts, name } = locate(path);

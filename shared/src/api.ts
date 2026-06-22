@@ -108,6 +108,19 @@ export interface CreateFileResponse {
   hash: FileHash;
 }
 
+// --- POST /api/folder --------------------------------------------------------
+// Create a new (empty) directory within the workspace root. 409 if it exists.
+
+export interface CreateFolderRequest {
+  root: RelPath;
+  path: RelPath;
+}
+
+export interface CreateFolderResponse {
+  path: RelPath;
+  created: true;
+}
+
 // --- DELETE /api/file --------------------------------------------------------
 
 export interface DeleteFileRequest {

@@ -189,3 +189,36 @@ describe('GET /api/raw', () => {
     assert.equal((res.json() as ApiError).code, 'OUTSIDE_ROOT');
   });
 });
+
+describe('POST /api/folder', () => {
+  it('creates a new folder (and nested parents)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/folder',
+      payload: { root: 'ws', path: 'notes/2026' },
+    });
+    assert.equal(res.statusCode, 201);
+    assert.deepEqual(res.json(), { path: 'notes/2026', created: true });
+    assert.ok(fs.statSync(path.join(base, 'ws', 'notes', '2026')).isDirectory());
+  });
+
+  it('409s when the folder already exists', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/folder',
+      payload: { root: 'ws', path: 'sub' },
+    });
+    assert.equal(res.statusCode, 409);
+    assert.equal((res.json() as ApiError).code, 'ALREADY_EXISTS');
+  });
+
+  it('403s on a traversal escape', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/folder',
+      payload: { root: 'ws', path: '../escape' },
+    });
+    assert.equal(res.statusCode, 403);
+    assert.equal((res.json() as ApiError).code, 'OUTSIDE_ROOT');
+  });
+});

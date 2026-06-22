@@ -9,6 +9,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type {
   PutFileRequest,
   CreateFileRequest,
+  CreateFolderRequest,
   DeleteFileRequest,
   MoveRequest,
 } from '@lookmd/shared';
@@ -21,6 +22,7 @@ import {
   readAsset,
   writeFile,
   createFile,
+  createFolder,
   deleteFile,
   moveFile,
 } from './workspace.ts';
@@ -80,6 +82,14 @@ export function buildApp(config: Config): FastifyInstance {
       const content = typeof body.content === 'string' ? body.content : '';
       reply.code(201);
       return createFile(config.base, root, path, content);
+    });
+
+    app.post('/api/folder', async (req, reply) => {
+      const body = (req.body ?? {}) as Partial<CreateFolderRequest>;
+      const root = typeof body.root === 'string' ? body.root : '';
+      const path = requireString(body.path, 'path');
+      reply.code(201);
+      return createFolder(config.base, root, path);
     });
 
     app.delete('/api/file', async (req) => {

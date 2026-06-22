@@ -11,6 +11,8 @@ import type {
   PutFileResponse,
   CreateFileRequest,
   CreateFileResponse,
+  CreateFolderRequest,
+  CreateFolderResponse,
   DeleteFileRequest,
   DeleteFileResponse,
   MoveRequest,
@@ -88,6 +90,9 @@ export const api = {
 
   create: (req: CreateFileRequest): Promise<CreateFileResponse> =>
     sendJson('POST', '/api/file', req),
+
+  createFolder: (req: CreateFolderRequest): Promise<CreateFolderResponse> =>
+    sendJson('POST', '/api/folder', req),
 
   remove: (req: DeleteFileRequest): Promise<DeleteFileResponse> =>
     sendJson('DELETE', '/api/file', req),
