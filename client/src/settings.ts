@@ -13,13 +13,33 @@ const SIDEBAR_KEY = 'lookmd.sidebar';
 const SIDEBAR_WIDTH_KEY = 'lookmd.sidebarWidth';
 const LINE_NUMBERS_KEY = 'lookmd.lineNumbers';
 
-export type ThemeId = 'paper' | 'daylight' | 'slate' | 'sanctum';
+export type ThemeId =
+  | 'paper'
+  | 'daylight'
+  | 'slate'
+  | 'sanctum'
+  | 'nord'
+  | 'mocha'
+  | 'latte'
+  | 'tokyo-night'
+  | 'gruvbox'
+  | 'rose-pine'
+  | 'solarized'
+  | 'dracula';
 
 export const THEMES: { id: ThemeId; label: string }[] = [
   { id: 'paper', label: 'Paper' },
   { id: 'daylight', label: 'Daylight' },
   { id: 'slate', label: 'Slate' },
   { id: 'sanctum', label: 'Sanctum' },
+  { id: 'nord', label: 'Nord' },
+  { id: 'mocha', label: 'Mocha' },
+  { id: 'latte', label: 'Latte' },
+  { id: 'tokyo-night', label: 'Tokyo Night' },
+  { id: 'gruvbox', label: 'Gruvbox' },
+  { id: 'rose-pine', label: 'Rosé Pine' },
+  { id: 'solarized', label: 'Solarized' },
+  { id: 'dracula', label: 'Dracula' },
 ];
 
 const DEFAULT_THEME: ThemeId = 'paper';
