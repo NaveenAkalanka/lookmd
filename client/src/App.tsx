@@ -7,7 +7,7 @@
  * tab strip + content pane.
  */
 
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TreeNode } from '@lookmd/shared';
 import { ApiRequestError } from './api';
 import { createRestSource } from './sources/rest';
@@ -26,79 +26,50 @@ import { createFsaSource, hasPermission } from './sources/fsa';
 import { WorkspacePicker } from './components/WorkspacePicker';
 import { FileTree } from './components/FileTree';
 import { CommandPalette } from './components/CommandPalette';
+import { CreateMenu } from './components/CreateMenu';
 import { Outline } from './components/Outline';
 import { Icon } from './components/Icon';
 import { Logo } from './components/Logo';
-import { BrandIcon } from './components/BrandIcon';
 import {
   Menu01Icon,
   Settings01Icon,
   PinIcon,
-  Add01Icon,
   Cancel01Icon,
+  LayoutRightIcon,
+  LayoutTwoColumnIcon,
+  LayoutTwoRowIcon,
+  File01Icon,
+  Txt01Icon,
+  Folder01Icon,
+  PencilEdit02Icon,
+  Delete02Icon,
+  Copy01Icon,
 } from '@hugeicons/core-free-icons';
-// The view components carry the heavy rendering/highlighting stacks
-// (react-markdown, highlight.js, CodeMirror). The first screen is just the
-// picker, so load them only once a file is actually open.
-const ReadView = lazy(() =>
-  import('./components/ReadView').then((m) => ({ default: m.ReadView })),
-);
-const SourceView = lazy(() =>
-  import('./components/SourceView').then((m) => ({ default: m.SourceView })),
-);
-const Editor = lazy(() =>
-  import('./components/Editor').then((m) => ({ default: m.Editor })),
-);
-import { ModeToggle, type ViewMode } from './components/ModeToggle';
+import { FilePane } from './components/FilePane';
+import { EditMenu } from './components/EditMenu';
+import { WorkspaceSearch } from './components/WorkspaceSearch';
+import { ContextMenu, type ContextMenuState, type MenuEntry } from './components/ContextMenu';
+import { type Tab, newTab, tabDirty } from './tab';
+import type { EditorApi } from './editorApi';
+import { type ViewMode } from './components/ModeToggle';
 import { SettingsPanel } from './components/SettingsPanel';
 import {
   getTheme,
   getFonts,
   getSidebar,
+  getSidebarWidth,
   getLineNumbers,
   setTheme as persistTheme,
   setFonts as persistFonts,
   setSidebar as persistSidebar,
+  setSidebarWidth as persistSidebarWidth,
   setLineNumbers as persistLineNumbers,
+  SIDEBAR_WIDTH_MIN,
+  SIDEBAR_WIDTH_MAX,
   type ThemeId,
   type Fonts,
   type SidebarPref,
 } from './settings';
-
-/** One open file. `content`/`hash` are the last-saved snapshot (null until the
- *  initial load resolves); `draft` is the live buffer shown in every mode. */
-interface Tab {
-  path: string;
-  content: string | null;
-  hash: string | null;
-  draft: string;
-  loading: boolean;
-  error: string | null;
-  conflict: boolean;
-  saveError: string | null;
-  saving: boolean;
-  /** Bumped on a reload so the editor re-seeds its document from fresh content. */
-  reloadNonce: number;
-}
-
-function newTab(path: string): Tab {
-  return {
-    path,
-    content: null,
-    hash: null,
-    draft: '',
-    loading: true,
-    error: null,
-    conflict: false,
-    saveError: null,
-    saving: false,
-    reloadNonce: 0,
-  };
-}
-
-function tabDirty(t: Tab): boolean {
-  return t.content !== null && t.draft !== t.content;
-}
 
 function baseName(path: string): string {
   return path.split('/').pop() ?? path;
@@ -138,10 +109,11 @@ function isViewMode(m: string): m is ViewMode {
   return m === 'read' || m === 'source' || m === 'edit' || m === 'split';
 }
 
-/** Default a bare name to `.md` so it passes the backend's text allowlist. */
-function ensureTextExt(name: string): string {
+/** Append a default extension (so the name passes the text allowlist) unless the
+ *  user already typed a recognized text extension. */
+function ensureExt(name: string, ext: 'md' | 'txt'): string {
   if (name === '') return '';
-  return /\.(md|markdown|mdown|mkd|txt|text)$/i.test(name) ? name : `${name}.md`;
+  return /\.(md|markdown|mdown|mkd|txt|text)$/i.test(name) ? name : `${name}.${ext}`;
 }
 
 export function App() {
@@ -181,6 +153,22 @@ export function App() {
     boot.session && isViewMode(boot.session.mode) ? boot.session.mode : 'read',
   );
 
+  // Multi-file split: an optional second pane bound to another open tab, laid
+  // out beside ('row') or below ('column') the primary one, with its own mode.
+  // `focusedPane` is the one keyboard Save targets.
+  const [secondaryPath, setSecondaryPath] = useState<string | null>(null);
+  const [secondaryMode, setSecondaryMode] = useState<ViewMode>('read');
+  const [splitDir, setSplitDir] = useState<'row' | 'column'>('row');
+  const [focusedPane, setFocusedPane] = useState<'primary' | 'secondary'>('primary');
+
+  // Edit menu: the command API of the focused editor (null when none is focused),
+  // the open Find/Replace-in-Files panel, and a "reveal this line" pulse for the
+  // primary editor (set when opening a search result).
+  const [editApi, setEditApi] = useState<EditorApi | null>(null);
+  const [searchMode, setSearchMode] = useState<'find' | 'replace' | null>(null);
+  const [reveal, setReveal] = useState<{ line: number; nonce: number } | undefined>(undefined);
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
+
   // Appearance (already applied to the DOM at bootstrap; mirror it in state).
   const [theme, setTheme] = useState<ThemeId>(() => getTheme());
   const [fonts, setFonts] = useState<Fonts>(() => getFonts());
@@ -192,9 +180,29 @@ export function App() {
   const [sidebar, setSidebarState] = useState<SidebarPref>(() => getSidebar());
   const [lineNumbers, setLineNumbersState] = useState<boolean>(() => getLineNumbers());
   const [peek, setPeek] = useState(false);
-  const sidebarVisible = sidebar.autoHide ? peek : !sidebar.collapsed;
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => getSidebarWidth());
+
+  // On narrow/touch screens the sidebar becomes a drawer overlay with its own
+  // open state, ignoring the desktop pinned/auto-hide pref entirely.
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 720px)').matches,
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 720px)');
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const sidebarVisible = isMobile ? drawerOpen : sidebar.autoHide ? peek : !sidebar.collapsed;
 
   const activeTab = tabs.find((t) => t.path === activePath) ?? null;
+  // A split pane only renders when its file is still open and differs is fine
+  // (the same file in both panes shares one buffer).
+  const secondaryTab =
+    secondaryPath ? (tabs.find((t) => t.path === secondaryPath) ?? null) : null;
+  const splitOn = secondaryTab !== null;
   const anyDirty = tabs.some(tabDirty);
 
   const updateTab = useCallback((path: string, patch: Partial<Tab>) => {
@@ -266,9 +274,10 @@ export function App() {
     persistLineNumbers(on);
   }, []);
   const toggleSidebar = useCallback(() => {
-    if (sidebar.autoHide) setPeek((p) => !p);
+    if (isMobile) setDrawerOpen((o) => !o);
+    else if (sidebar.autoHide) setPeek((p) => !p);
     else changeSidebar({ ...sidebar, collapsed: !sidebar.collapsed });
-  }, [sidebar, changeSidebar]);
+  }, [isMobile, sidebar, changeSidebar]);
 
   // Hover-intent for auto-hide: reveal instantly, but wait a grace period before
   // hiding so a brief stray movement off the panel doesn't snap it shut. Moving
@@ -293,6 +302,26 @@ export function App() {
   }, [cancelHide]);
   // Clear any pending timer on unmount.
   useEffect(() => cancelHide, [cancelHide]);
+
+  // Drag the sidebar's right edge to resize it. Tracks the pointer globally so
+  // the drag continues even if the cursor outruns the thin handle; the final
+  // width is persisted on release.
+  const startResize = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    document.body.classList.add('resizing-col');
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, ev.clientX));
+      setSidebarWidth(next);
+    };
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.classList.remove('resizing-col');
+      persistSidebarWidth(Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, ev.clientX)));
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }, []);
 
   const loadTree = useCallback(async () => {
     if (!source) return;
@@ -392,6 +421,7 @@ export function App() {
     (path: string) => {
       if (!source) return;
       setPeek(false); // collapse the auto-hide overlay once a file is chosen
+      setDrawerOpen(false); // and close the mobile drawer
       setActivePath(path);
       if (!tabs.some((t) => t.path === path)) {
         setTabs((ts) => (ts.some((t) => t.path === path) ? ts : [...ts, newTab(path)]));
@@ -413,8 +443,10 @@ export function App() {
       if (activePath === path) {
         setActivePath(next.length ? next[Math.min(idx, next.length - 1)]!.path : null);
       }
+      // Closing the file shown in the split collapses the split.
+      if (secondaryPath === path) setSecondaryPath(null);
     },
-    [tabs, activePath],
+    [tabs, activePath, secondaryPath],
   );
 
   const closeTab = useCallback(
@@ -428,38 +460,45 @@ export function App() {
     [tabs, dropTab],
   );
 
-  const save = useCallback(async () => {
-    if (!source || !activeTab || activeTab.content === null || activeTab.saving) return;
-    if (activeTab.draft === activeTab.content) return; // nothing to save
-    const { path, draft: text, hash } = activeTab;
-    updateTab(path, { saving: true, saveError: null, conflict: false });
-    try {
-      const res = await source.save(path, text, hash ?? '');
-      updateTab(path, { content: text, hash: res.hash, saving: false });
-    } catch (err) {
-      if (err instanceof ApiRequestError && err.code === 'CONFLICT') {
-        updateTab(path, { conflict: true, saving: false });
-      } else {
-        updateTab(path, {
-          saveError: err instanceof ApiRequestError ? err.message : 'save failed',
-          saving: false,
-        });
+  // Save a specific open tab (so either pane can save independently).
+  const savePath = useCallback(
+    async (path: string) => {
+      if (!source) return;
+      const tab = tabs.find((t) => t.path === path);
+      if (!tab || tab.content === null || tab.saving) return;
+      if (tab.draft === tab.content) return; // nothing to save
+      const text = tab.draft;
+      updateTab(path, { saving: true, saveError: null, conflict: false });
+      try {
+        const res = await source.save(path, text, tab.hash ?? '');
+        updateTab(path, { content: text, hash: res.hash, saving: false });
+      } catch (err) {
+        if (err instanceof ApiRequestError && err.code === 'CONFLICT') {
+          updateTab(path, { conflict: true, saving: false });
+        } else {
+          updateTab(path, {
+            saveError: err instanceof ApiRequestError ? err.message : 'save failed',
+            saving: false,
+          });
+        }
       }
-    }
-  }, [source, activeTab, updateTab]);
+    },
+    [source, tabs, updateTab],
+  );
 
-  // Global Ctrl/Cmd-S so saving works in any mode (and never triggers the
-  // browser's own save dialog).
+  // Global Ctrl/Cmd-S saves the focused pane (and never triggers the browser's
+  // own save dialog).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        void save();
+        const target = focusedPane === 'secondary' && secondaryPath ? secondaryPath : activePath;
+        if (target) void savePath(target);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [save]);
+  }, [savePath, focusedPane, secondaryPath, activePath]);
 
   // Ctrl/Cmd-B toggles the sidebar (collapse in pinned mode, peek in auto-hide).
   useEffect(() => {
@@ -485,54 +524,76 @@ export function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // Ctrl/Cmd-Shift-F / -H open workspace Find / Replace in Files.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setSearchMode('find');
+      } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'h') {
+        e.preventDefault();
+        setSearchMode('replace');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   // Conflict resolution: discard local edits and re-read from disk.
-  const discardAndReload = useCallback(async () => {
-    if (!source || !activeTab) return;
-    const { path, reloadNonce } = activeTab;
-    try {
-      const fresh = await source.file(path);
-      updateTab(path, {
-        content: fresh.content,
-        hash: fresh.hash,
-        draft: fresh.content,
-        conflict: false,
-        saveError: null,
-        reloadNonce: reloadNonce + 1,
-      });
-    } catch (err) {
-      updateTab(path, { saveError: err instanceof ApiRequestError ? err.message : 'reload failed' });
-    }
-  }, [source, activeTab, updateTab]);
+  const discardReloadPath = useCallback(
+    async (path: string) => {
+      if (!source) return;
+      const tab = tabs.find((t) => t.path === path);
+      if (!tab) return;
+      try {
+        const fresh = await source.file(path);
+        updateTab(path, {
+          content: fresh.content,
+          hash: fresh.hash,
+          draft: fresh.content,
+          conflict: false,
+          saveError: null,
+          reloadNonce: tab.reloadNonce + 1,
+        });
+      } catch (err) {
+        updateTab(path, { saveError: err instanceof ApiRequestError ? err.message : 'reload failed' });
+      }
+    },
+    [source, tabs, updateTab],
+  );
 
   // Conflict resolution: keep local edits and overwrite, re-reading only to get
   // the current hash so the second save passes the check.
-  const overwrite = useCallback(async () => {
-    if (!source || !activeTab) return;
-    const { path, draft: text } = activeTab;
-    updateTab(path, { saving: true });
-    try {
-      const fresh = await source.file(path);
-      const res = await source.save(path, text, fresh.hash);
-      updateTab(path, {
-        content: text,
-        hash: res.hash,
-        conflict: false,
-        saveError: null,
-        saving: false,
-      });
-    } catch (err) {
-      updateTab(path, {
-        saveError: err instanceof ApiRequestError ? err.message : 'overwrite failed',
-        saving: false,
-      });
-    }
-  }, [source, activeTab, updateTab]);
-
-  const setActiveDraft = useCallback(
-    (next: string) => {
-      if (activePath) updateTab(activePath, { draft: next });
+  const overwritePath = useCallback(
+    async (path: string) => {
+      if (!source) return;
+      const tab = tabs.find((t) => t.path === path);
+      if (!tab) return;
+      const text = tab.draft;
+      updateTab(path, { saving: true });
+      try {
+        const fresh = await source.file(path);
+        const res = await source.save(path, text, fresh.hash);
+        updateTab(path, {
+          content: text,
+          hash: res.hash,
+          conflict: false,
+          saveError: null,
+          saving: false,
+        });
+      } catch (err) {
+        updateTab(path, {
+          saveError: err instanceof ApiRequestError ? err.message : 'overwrite failed',
+          saving: false,
+        });
+      }
     },
-    [activePath, updateTab],
+    [source, tabs, updateTab],
+  );
+
+  const setDraftFor = useCallback(
+    (path: string, next: string) => updateTab(path, { draft: next }),
+    [updateTab],
   );
 
   // --- Tree actions (create / rename / delete) ---------------------------
@@ -540,11 +601,12 @@ export function App() {
   // so the UI matches: new-file lives on folders, rename/delete on files.
 
   const newFile = useCallback(
-    async (dir: string) => {
+    async (dir: string, ext: 'md' | 'txt' = 'md') => {
       if (!source) return;
-      const input = window.prompt(`New file name${dir ? ` in ${dir}/` : ''}:`, 'untitled.md');
+      const kind = ext === 'txt' ? 'text' : 'Markdown';
+      const input = window.prompt(`New ${kind} file name${dir ? ` in ${dir}/` : ''}:`, `untitled.${ext}`);
       if (input === null) return;
-      const name = ensureTextExt(input.trim());
+      const name = ensureExt(input.trim(), ext);
       if (!name) return;
       const path = dir ? `${dir}/${name}` : name;
       setActionError(null);
@@ -559,13 +621,33 @@ export function App() {
     [source, loadTree, openFile],
   );
 
+  const newFolder = useCallback(
+    async (dir: string) => {
+      if (!source) return;
+      const input = window.prompt(`New folder name${dir ? ` in ${dir}/` : ''}:`, 'untitled');
+      if (input === null) return;
+      const name = input.trim().replace(/^\/+|\/+$/g, '');
+      if (!name) return;
+      const path = dir ? `${dir}/${name}` : name;
+      setActionError(null);
+      try {
+        await source.mkdir(path);
+        await loadTree();
+      } catch (err) {
+        setActionError(err instanceof ApiRequestError ? err.message : 'could not create folder');
+      }
+    },
+    [source, loadTree],
+  );
+
   const renameFile = useCallback(
     async (path: string) => {
       if (!source) return;
       const base = baseName(path);
       const input = window.prompt('Rename file to:', base);
       if (input === null) return;
-      const newName = ensureTextExt(input.trim());
+      const ext = /\.(txt|text)$/i.test(path) ? 'txt' : 'md';
+      const newName = ensureExt(input.trim(), ext);
       if (!newName || newName === base) return;
       const slash = path.lastIndexOf('/');
       const to = slash >= 0 ? `${path.slice(0, slash)}/${newName}` : newName;
@@ -599,30 +681,31 @@ export function App() {
     [source, dropTab, loadTree],
   );
 
-  const docKey = activeTab
-    ? `${workspace?.root ?? ''}::${activeTab.path}#${activeTab.reloadNonce}`
-    : '';
-
-  // Resolve a Markdown image src (relative to the open file's folder) to a URL
-  // the browser can load via the active source. External URLs pass through.
-  const activeDir = activeTab ? dirName(activeTab.path) : '';
-  const resolveImage = useCallback(
-    (src: string): Promise<string> => {
-      if (!source || isExternalUrl(src)) return Promise.resolve(src);
-      return source.assetUrl(joinPath(activeDir, src));
-    },
-    [source, activeDir],
+  const docKeyFor = useCallback(
+    (tab: Tab) => `${workspace?.root ?? ''}::${tab.path}#${tab.reloadNonce}`,
+    [workspace],
   );
 
-  // Follow an internal link from the Read view: resolve relative to the open
-  // file, falling back to a workspace-wide basename match (wiki-style), then
-  // open it in a tab.
-  const navigateLink = useCallback(
-    (href: string) => {
+  // Resolve a Markdown image src (relative to a given file's folder) to a URL
+  // the browser can load via the active source. External URLs pass through.
+  // Built per directory so each pane resolves against its own file.
+  const makeResolveImage = useCallback(
+    (dir: string) =>
+      (src: string): Promise<string> => {
+        if (!source || isExternalUrl(src)) return Promise.resolve(src);
+        return source.assetUrl(joinPath(dir, src));
+      },
+    [source],
+  );
+
+  // Follow an internal link: resolve relative to the source file's folder,
+  // falling back to a workspace-wide basename match (wiki-style), then open it.
+  const navigateFrom = useCallback(
+    (dir: string, href: string) => {
       if (!source) return;
       const clean = decodeURIComponent(href.split('#')[0]?.split('?')[0] ?? '');
       if (!clean) return;
-      const joined = joinPath(activeDir, clean);
+      const joined = joinPath(dir, clean);
       const files = flattenFiles(tree);
       const wanted = (clean.split('/').pop() ?? clean).toLowerCase();
       const target =
@@ -631,7 +714,147 @@ export function App() {
         joined;
       openFile(target);
     },
-    [source, activeDir, tree, openFile],
+    [source, tree, openFile],
+  );
+
+  // Stable per-pane resolvers (memoized on the pane's directory) so the Read
+  // view doesn't re-fetch images on every render.
+  const primaryDir = activeTab ? dirName(activeTab.path) : '';
+  const secondaryDir = secondaryTab ? dirName(secondaryTab.path) : '';
+  const primaryResolveImage = useMemo(() => makeResolveImage(primaryDir), [makeResolveImage, primaryDir]);
+  const secondaryResolveImage = useMemo(() => makeResolveImage(secondaryDir), [makeResolveImage, secondaryDir]);
+  const primaryNavigate = useCallback((href: string) => navigateFrom(primaryDir, href), [navigateFrom, primaryDir]);
+  const secondaryNavigate = useCallback((href: string) => navigateFrom(secondaryDir, href), [navigateFrom, secondaryDir]);
+
+  // Split controls: open the active file in a second pane, or collapse it.
+  const enableSplit = useCallback(() => {
+    if (!activePath) return;
+    const other = tabs.find((t) => t.path !== activePath)?.path ?? activePath;
+    setSecondaryPath(other);
+    setFocusedPane('secondary');
+  }, [activePath, tabs]);
+  const closeSplit = useCallback(() => {
+    setSecondaryPath(null);
+    setFocusedPane('primary');
+  }, []);
+
+  // Track the focused editor for the Edit menu; drop it if that editor unmounts.
+  const onEditorFocusApi = useCallback((api: EditorApi) => setEditApi(api), []);
+  const onEditorReleaseApi = useCallback(
+    (api: EditorApi) => setEditApi((cur) => (cur === api ? null : cur)),
+    [],
+  );
+
+  // Open a Find-in-Files result: focus the file in the primary pane, switch to
+  // Edit mode, and pulse the reveal so the editor scrolls to the line.
+  const openFromSearch = useCallback(
+    (path: string, line: number) => {
+      openFile(path);
+      setMode('edit');
+      setReveal((r) => ({ line, nonce: (r?.nonce ?? 0) + 1 }));
+    },
+    [openFile],
+  );
+
+  // After a Replace-in-Files run, refresh the on-disk content of any open tab
+  // that has no unsaved edits, so panes reflect the rewrite (dirty tabs are left
+  // alone and will hit the normal 409 conflict guard on their next save).
+  const reloadCleanTabs = useCallback(() => {
+    if (!source) return;
+    for (const t of tabs) {
+      if (!tabDirty(t)) fetchInto(source, t.path);
+    }
+  }, [source, tabs, fetchInto]);
+
+  // --- Right-click context menus -----------------------------------------
+
+  // Open a file in the split pane without stealing focus from the primary one.
+  const openToSide = useCallback(
+    (path: string) => {
+      if (!source) return;
+      if (!tabs.some((t) => t.path === path)) {
+        setTabs((ts) => (ts.some((t) => t.path === path) ? ts : [...ts, newTab(path)]));
+        loadTab(path);
+      }
+      setSecondaryPath(path);
+      setFocusedPane('secondary');
+    },
+    [source, tabs, loadTab],
+  );
+
+  const copyText = useCallback((text: string) => {
+    void navigator.clipboard?.writeText(text);
+  }, []);
+
+  const closeOthers = useCallback(
+    (keep: string) => {
+      const others = tabs.filter((t) => t.path !== keep);
+      if (others.some(tabDirty) && !window.confirm('Close other files? Unsaved changes will be lost.'))
+        return;
+      setTabs((ts) => ts.filter((t) => t.path === keep));
+      setActivePath(keep);
+      if (secondaryPath && secondaryPath !== keep) setSecondaryPath(null);
+    },
+    [tabs, secondaryPath],
+  );
+
+  const closeAll = useCallback(() => {
+    if (tabs.some(tabDirty) && !window.confirm('Close all files? Unsaved changes will be lost.')) return;
+    setTabs([]);
+    setActivePath(null);
+    setSecondaryPath(null);
+  }, [tabs]);
+
+  const showMenu = useCallback((e: React.MouseEvent, items: MenuEntry[]) => {
+    e.preventDefault();
+    setCtxMenu({ x: e.clientX, y: e.clientY, items });
+  }, []);
+
+  // File-tree right-click: a node (file/folder) or the empty area (null = root).
+  const fileTreeMenu = useCallback(
+    (e: React.MouseEvent, node: TreeNode | null) => {
+      const dir = node && node.type === 'dir' ? node.path : '';
+      const createItems: MenuEntry[] = [
+        { label: 'New Markdown file', icon: File01Icon, onClick: () => void newFile(dir, 'md') },
+        { label: 'New text file', icon: Txt01Icon, onClick: () => void newFile(dir, 'txt') },
+        { label: 'New folder', icon: Folder01Icon, onClick: () => void newFolder(dir) },
+      ];
+      if (!node) {
+        showMenu(e, createItems);
+      } else if (node.type === 'dir') {
+        showMenu(e, [
+          ...createItems,
+          'separator',
+          { label: 'Copy path', icon: Copy01Icon, onClick: () => copyText(node.path) },
+        ]);
+      } else {
+        showMenu(e, [
+          { label: 'Open', onClick: () => openFile(node.path) },
+          { label: 'Open to the side', icon: LayoutRightIcon, onClick: () => openToSide(node.path) },
+          'separator',
+          { label: 'Rename', icon: PencilEdit02Icon, onClick: () => void renameFile(node.path) },
+          { label: 'Delete', icon: Delete02Icon, danger: true, onClick: () => void deleteFile(node.path) },
+          'separator',
+          { label: 'Copy path', icon: Copy01Icon, onClick: () => copyText(node.path) },
+        ]);
+      }
+    },
+    [newFile, newFolder, openFile, openToSide, renameFile, deleteFile, copyText, showMenu],
+  );
+
+  // Tab right-click: close actions + open-to-side + copy path.
+  const tabMenu = useCallback(
+    (e: React.MouseEvent, path: string) => {
+      showMenu(e, [
+        { label: 'Close', onClick: () => closeTab(path) },
+        { label: 'Close others', onClick: () => closeOthers(path), disabled: tabs.length <= 1 },
+        { label: 'Close all', onClick: () => closeAll() },
+        'separator',
+        { label: 'Open to the side', icon: LayoutRightIcon, onClick: () => openToSide(path) },
+        { label: 'Copy path', icon: Copy01Icon, onClick: () => copyText(path) },
+      ]);
+    },
+    [closeTab, closeOthers, closeAll, openToSide, copyText, tabs.length, showMenu],
   );
 
   // Jump to a heading from the outline: ensure Read mode, then scroll to its id
@@ -680,7 +903,7 @@ export function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app" style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
       <header className="topbar">
         <button
           className="btn icon-btn"
@@ -692,9 +915,13 @@ export function App() {
           <Icon icon={Menu01Icon} />
         </button>
         <span className="brand" title="lookmd">
-          <BrandIcon size={22} />
           <Logo height={18} />
         </span>
+        <EditMenu
+          editApi={editApi}
+          onFindInFiles={() => setSearchMode('find')}
+          onReplaceInFiles={() => setSearchMode('replace')}
+        />
         <span className="workspace-name" title={workspace.root || '/'}>
           {workspace.name}
         </span>
@@ -705,14 +932,21 @@ export function App() {
       </header>
 
       <div
-        className={`body${sidebar.autoHide ? ' body-autohide' : ''}${
+        className={`body${isMobile ? ' body-mobile' : sidebar.autoHide ? ' body-autohide' : ''}${
           sidebarVisible ? '' : ' sidebar-hidden'
         }`}
       >
-        {sidebar.autoHide && !sidebarVisible && (
+        {!isMobile && sidebar.autoHide && !sidebarVisible && (
           <div
             className="sidebar-reveal"
             onMouseEnter={revealSidebar}
+            aria-hidden="true"
+          />
+        )}
+        {isMobile && sidebarVisible && (
+          <div
+            className="sidebar-backdrop"
+            onClick={() => setDrawerOpen(false)}
             aria-hidden="true"
           />
         )}
@@ -736,14 +970,12 @@ export function App() {
             >
               <Icon icon={PinIcon} size={16} />
             </button>
-            <button
-              className="tree-action"
-              title="New file in workspace root"
-              aria-label="New file in workspace root"
-              onClick={() => void newFile('')}
-            >
-              <Icon icon={Add01Icon} size={16} />
-            </button>
+            <CreateMenu
+              dir=""
+              onNewFile={(dir, ext) => void newFile(dir, ext)}
+              onNewFolder={(dir) => void newFolder(dir)}
+              label="New in workspace root"
+            />
           </div>
           {actionError && (
             <p className="error sidebar-empty sidebar-action-error" onClick={() => setActionError(null)}>
@@ -757,7 +989,9 @@ export function App() {
               tree={tree}
               activePath={activePath}
               onOpenFile={openFile}
-              onNewFile={(dir) => void newFile(dir)}
+              onNewFile={(dir, ext) => void newFile(dir, ext)}
+              onNewFolder={(dir) => void newFolder(dir)}
+              onContextMenu={fileTreeMenu}
               onRename={(path) => void renameFile(path)}
               onDelete={(path) => void deleteFile(path)}
             />
@@ -766,6 +1000,17 @@ export function App() {
             <Outline content={activeTab.draft} onJump={jumpToHeading} />
           )}
         </aside>
+
+        {!isMobile && !sidebar.autoHide && sidebarVisible && (
+          <div
+            className="sidebar-resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+            title="Drag to resize"
+            onPointerDown={startResize}
+          />
+        )}
 
         <main className="content">
           {tabs.length > 0 && (
@@ -778,6 +1023,7 @@ export function App() {
                   aria-selected={t.path === activePath}
                   title={t.path}
                   onClick={() => activateTab(t.path)}
+                  onContextMenu={(e) => tabMenu(e, t.path)}
                   onMouseDown={(e) => {
                     if (e.button === 1) {
                       e.preventDefault();
@@ -807,99 +1053,81 @@ export function App() {
             </div>
           )}
 
-          {activeTab && activeTab.content !== null && !activeTab.error && (
-            <div className="file-bar">
-              <span className="file-bar-name" title={activeTab.path}>
-                {activeTab.path}
-                {tabDirty(activeTab) && (
-                  <span className="dirty-dot" title="Unsaved changes" aria-label="Unsaved changes">
-                    ●
-                  </span>
-                )}
-              </span>
-              <ModeToggle mode={mode} onChange={setMode} />
-              <button
-                className="btn btn-accent"
-                onClick={() => void save()}
-                disabled={!tabDirty(activeTab) || activeTab.saving}
-              >
-                {activeTab.saving ? 'Saving…' : 'Save'}
-              </button>
+          {!activeTab && (
+            <div className="view">
+              <div className="placeholder">Select a file to read.</div>
             </div>
           )}
 
-          {activeTab && activeTab.conflict && (
-            <div className="banner banner-warn">
-              <span>
-                This file changed on disk since you opened it. Saving now would clobber
-                that change.
-              </span>
-              <span className="banner-actions">
-                <button className="btn" onClick={() => void discardAndReload()}>
-                  Reload from disk
-                </button>
-                <button className="btn" onClick={() => void overwrite()} disabled={activeTab.saving}>
-                  Overwrite anyway
-                </button>
-              </span>
+          {activeTab && (
+            <div className={`panes panes-${splitDir}`}>
+              <FilePane
+                tab={activeTab}
+                mode={mode}
+                onMode={setMode}
+                lineNumbers={lineNumbers}
+                docKey={docKeyFor(activeTab)}
+                resolveImage={primaryResolveImage}
+                onNavigate={primaryNavigate}
+                onChangeDraft={(next) => setDraftFor(activeTab.path, next)}
+                onSave={() => void savePath(activeTab.path)}
+                onDiscardReload={() => void discardReloadPath(activeTab.path)}
+                onOverwrite={() => void overwritePath(activeTab.path)}
+                focused={splitOn && focusedPane === 'primary'}
+                onFocusPane={() => setFocusedPane('primary')}
+                onEditorFocusApi={onEditorFocusApi}
+                onEditorReleaseApi={onEditorReleaseApi}
+                reveal={reveal}
+                controls={
+                  splitOn ? (
+                    <button
+                      className="btn icon-btn"
+                      title={
+                        splitDir === 'row'
+                          ? 'Stack panes (horizontal split)'
+                          : 'Side-by-side panes (vertical split)'
+                      }
+                      aria-label="Toggle split orientation"
+                      onClick={() => setSplitDir((d) => (d === 'row' ? 'column' : 'row'))}
+                    >
+                      <Icon icon={splitDir === 'row' ? LayoutTwoRowIcon : LayoutTwoColumnIcon} size={16} />
+                    </button>
+                  ) : (
+                    <button
+                      className="btn icon-btn"
+                      title="Split: open a second file pane"
+                      aria-label="Split editor"
+                      onClick={enableSplit}
+                    >
+                      <Icon icon={LayoutRightIcon} size={16} />
+                    </button>
+                  )
+                }
+              />
+              {secondaryTab && (
+                <FilePane
+                  tab={secondaryTab}
+                  mode={secondaryMode}
+                  onMode={setSecondaryMode}
+                  lineNumbers={lineNumbers}
+                  docKey={docKeyFor(secondaryTab)}
+                  resolveImage={secondaryResolveImage}
+                  onNavigate={secondaryNavigate}
+                  onChangeDraft={(next) => setDraftFor(secondaryTab.path, next)}
+                  onSave={() => void savePath(secondaryTab.path)}
+                  onDiscardReload={() => void discardReloadPath(secondaryTab.path)}
+                  onOverwrite={() => void overwritePath(secondaryTab.path)}
+                  focused={focusedPane === 'secondary'}
+                  onFocusPane={() => setFocusedPane('secondary')}
+                  openPaths={tabs.map((t) => t.path)}
+                  onPick={(p) => setSecondaryPath(p)}
+                  onClose={closeSplit}
+                  onEditorFocusApi={onEditorFocusApi}
+                  onEditorReleaseApi={onEditorReleaseApi}
+                />
+              )}
             </div>
           )}
-          {activeTab && activeTab.saveError && (
-            <div className="banner banner-error">{activeTab.saveError}</div>
-          )}
-
-          <div className="view">
-            {!activeTab && <div className="placeholder">Select a file to read.</div>}
-            {activeTab && activeTab.loading && (
-              <div className="placeholder">Loading {activeTab.path}…</div>
-            )}
-            {activeTab && activeTab.error && (
-              <div className="placeholder error">{activeTab.error}</div>
-            )}
-            {activeTab && activeTab.content !== null && !activeTab.loading && !activeTab.error && (
-              <Suspense fallback={<div className="placeholder">Loading…</div>}>
-                {mode === 'read' && (
-                  <ReadView
-                    content={activeTab.draft}
-                    resolveImage={resolveImage}
-                    onNavigate={navigateLink}
-                  />
-                )}
-                {mode === 'source' && (
-                  <SourceView content={activeTab.draft} lineNumbers={lineNumbers} />
-                )}
-                {mode === 'edit' && (
-                  <Editor
-                    value={activeTab.draft}
-                    docKey={docKey}
-                    onChange={setActiveDraft}
-                    onSave={() => void save()}
-                    lineNumbers={lineNumbers}
-                  />
-                )}
-                {mode === 'split' && (
-                  <div className="split">
-                    <div className="split-pane split-editor">
-                      <Editor
-                        value={activeTab.draft}
-                        docKey={docKey}
-                        onChange={setActiveDraft}
-                        onSave={() => void save()}
-                        lineNumbers={lineNumbers}
-                      />
-                    </div>
-                    <div className="split-pane split-preview">
-                      <ReadView
-                        content={activeTab.draft}
-                        resolveImage={resolveImage}
-                        onNavigate={navigateLink}
-                      />
-                    </div>
-                  </div>
-                )}
-              </Suspense>
-            )}
-          </div>
         </main>
       </div>
 
@@ -914,6 +1142,17 @@ export function App() {
           onClose={() => setPaletteOpen(false)}
         />
       )}
+      {searchMode && source && (
+        <WorkspaceSearch
+          files={flattenFiles(tree)}
+          source={source}
+          startMode={searchMode}
+          onOpen={openFromSearch}
+          onClose={() => setSearchMode(null)}
+          onAfterReplace={reloadCleanTabs}
+        />
+      )}
+      <ContextMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />
     </div>
   );
 }

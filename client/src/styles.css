@@ -186,6 +186,36 @@ body {
   font-size: 14px;
 }
 
+/* --- Scrollbars ---------------------------------------------------------- */
+/* Token-driven, theme-aware scrollbars (mixed from --text/--border so each
+ * theme gets a fitting tone). Firefox uses the standard properties; Chromium/
+ * WebKit use the pseudo-elements below. Thumbs are translucent and only firm up
+ * on hover, so they recede until needed. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-tertiary) 55%, transparent) transparent;
+}
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-tertiary) 45%, transparent);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-secondary) 70%, transparent);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* --- Buttons ------------------------------------------------------------- */
 .btn {
   display: inline-flex;
@@ -276,9 +306,45 @@ body {
   transition: width 0.18s ease, transform 0.18s ease;
 }
 
+/* Drag handle straddling the sidebar's right border. Zero net layout width
+ * (negative margins) so it doesn't shift the columns; it's purely a grab strip
+ * that highlights on hover/drag. */
+.sidebar-resizer {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 5;
+  width: 7px;
+  margin: 0 -4px 0 -3px;
+  cursor: col-resize;
+}
+.sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.sidebar-resizer:hover::after,
+body.resizing-col .sidebar-resizer::after {
+  background: var(--accent);
+}
+/* While dragging, force the resize cursor everywhere and kill text selection. */
+body.resizing-col {
+  cursor: col-resize;
+  user-select: none;
+}
+/* No width animation during an active drag — it must track the pointer 1:1. */
+body.resizing-col .sidebar {
+  transition: none;
+}
+
 /* Manual collapse (pinned mode): the sidebar leaves the layout and the content
- * reflows to full width. */
-.body.sidebar-hidden:not(.body-autohide) .sidebar {
+ * reflows to full width. Excludes mobile, where the sidebar is a sliding drawer
+ * (see the mobile media query) rather than a collapsing column. */
+.body.sidebar-hidden:not(.body-autohide):not(.body-mobile) .sidebar {
   width: 0;
   padding: 0;
   border-right: none;
@@ -605,6 +671,53 @@ body {
 }
 
 /* --- Split (editor + live preview) --------------------------------------- */
+/* --- Multi-file panes (split view across two files) ---------------------- */
+/* The content area holds one or two panes; each pane is a full file region
+ * (its own file-bar + scrolling view). 'row' = side by side, 'column' = stacked. */
+.panes {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.panes-row {
+  flex-direction: row;
+}
+.panes-column {
+  flex-direction: column;
+}
+.pane {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.panes-row > .pane + .pane {
+  border-left: 1px solid var(--border);
+}
+.panes-column > .pane + .pane {
+  border-top: 1px solid var(--border);
+}
+/* The focused pane (keyboard-Save target) gets a subtle accent rule on top. */
+.pane-focused > .file-bar {
+  box-shadow: inset 0 2px 0 var(--accent-2);
+}
+/* File switcher in a split pane's bar. */
+.pane-switch {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
 .split {
   display: flex;
   height: 100%;
@@ -847,6 +960,88 @@ body {
   padding: 16px;
   overflow: auto;
 }
+
+/* --- Find / Replace in Files -------------------------------------------- */
+.search-window {
+  width: 620px;
+  max-height: 78vh;
+}
+.search-controls {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.search-replace {
+  width: 100%;
+}
+.search-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-actions-spacer {
+  flex: 1;
+}
+.search-status {
+  margin: 0;
+  font-size: 12px;
+}
+.search-results {
+  overflow: auto;
+  padding: 6px 8px 12px;
+}
+.search-file {
+  margin-top: 8px;
+}
+.search-file-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.search-file-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-file-count {
+  color: var(--text-tertiary);
+}
+.search-hit {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 4px 8px 4px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.search-hit:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.search-hit-line {
+  flex-shrink: 0;
+  min-width: 34px;
+  text-align: right;
+  color: var(--text-tertiary);
+}
+.search-hit-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .settings-title {
   margin: 0;
   font-size: 14px;
@@ -960,13 +1155,23 @@ body {
   margin: 0;
   padding: 0;
 }
+/* Top level gets side breathing room so rows aren't jammed against the edge. */
+.sidebar .tree:not(.tree-nested) {
+  padding: 4px 8px 10px;
+}
+/* Nested levels indent and carry a faint guide line. */
+.tree-nested {
+  margin-left: 15px;
+  padding-left: 3px;
+  border-left: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+}
 .tree-row-wrap {
   position: relative;
 }
 .tree-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 7px;
   width: 100%;
   border: none;
   background: none;
@@ -974,11 +1179,12 @@ body {
   font-size: 13px;
   color: var(--text-primary);
   text-align: left;
-  padding: 4px 8px;
+  padding: 6px 9px;
+  border-radius: 7px;
   cursor: pointer;
 }
-.tree-row-wrap:hover .tree-row {
-  background: var(--background);
+.tree-row-wrap:hover > .tree-row {
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
 }
 
 /* Row actions: hidden until the row is hovered/focused. */
@@ -1004,7 +1210,7 @@ body {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1;
-  border-radius: 4px;
+  border-radius: 5px;
   padding: 3px 5px;
   cursor: pointer;
 }
@@ -1019,10 +1225,173 @@ body {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
-.tree-twisty {
-  width: 12px;
+
+/* "New file/folder" popover menu (sidebar header + folder rows). */
+.create-menu {
+  position: relative;
+  display: inline-flex;
+}
+.create-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 40;
+  min-width: 184px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.create-pop-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.create-pop-item:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* --- Topbar dropdown menu (Edit) ---------------------------------------- */
+.menu {
+  position: relative;
+  display: inline-flex;
+}
+.menu-trigger {
+  padding: 4px 12px;
+}
+.menu-trigger-open {
+  border-color: var(--accent);
+}
+.menu-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  min-width: 248px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.menu-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.menu-item:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+.menu-item-label {
+  flex: 1;
+}
+.menu-key {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+.menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+/* --- Right-click context menu ------------------------------------------- */
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 204px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26);
+}
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.context-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.context-item:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+.context-item-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+.context-item-noicon {
+  width: 15px;
+  flex-shrink: 0;
+}
+.context-item-label {
+  flex: 1;
+}
+.context-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+/* Disclosure chevron rotates from ▸ to ▾ as the folder opens. */
+.tree-chevron {
   color: var(--text-tertiary);
   flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.tree-chevron-open {
+  transform: rotate(90deg);
+}
+.tree-icon {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+.tree-dir .tree-icon {
+  color: var(--accent);
 }
 .tree-label {
   overflow: hidden;
@@ -1031,11 +1400,19 @@ body {
 }
 .tree-dir {
   color: var(--text-secondary);
+  font-weight: 500;
+}
+/* Files have no chevron — pad their icon to line up under folder icons. */
+.tree-file .tree-icon {
+  margin-left: 21px;
 }
 .tree-file-active,
-.tree-row-wrap:hover .tree-row.tree-file-active {
+.tree-row-wrap:hover > .tree-row.tree-file-active {
   background: var(--accent-2);
   color: var(--surface);
+}
+.tree-file-active .tree-icon {
+  color: color-mix(in srgb, var(--surface) 80%, transparent);
 }
 
 /* --- Workspace picker ---------------------------------------------------- */
@@ -1227,4 +1604,95 @@ body {
 }
 .read img {
   max-width: 100%;
+}
+
+/* --- Mobile / responsive ------------------------------------------------- */
+/* Below 720px the sidebar becomes a drawer that slides in over the content with
+ * a dimmed backdrop (driven by .body-mobile in App), the chrome condenses, and
+ * touch targets grow. Above this width the desktop layout above applies. */
+@media (max-width: 720px) {
+  :root {
+    --topbar-height: 48px;
+  }
+
+  .topbar {
+    gap: 8px;
+    padding: 0 8px;
+  }
+  /* Let the workspace name yield space; the menu, brand, and buttons stay. */
+  .workspace-name {
+    font-size: 13px;
+  }
+
+  /* Sidebar as an overlay drawer, regardless of the desktop pin/auto-hide pref. */
+  .body-mobile {
+    position: relative;
+  }
+  .body-mobile .sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(82vw, 320px);
+    z-index: 30;
+    transform: translateX(0);
+    box-shadow: 2px 0 18px rgba(0, 0, 0, 0.3);
+  }
+  .body-mobile.sidebar-hidden .sidebar {
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+  /* Tap-anywhere-else scrim that closes the drawer. */
+  .sidebar-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 25;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  /* Roomier rows and controls for touch. */
+  .tree-row {
+    padding: 9px 10px;
+  }
+  .tab {
+    height: 40px;
+  }
+  .file-bar {
+    gap: 8px;
+    padding: 0 8px;
+  }
+  /* The path label is the first thing to sacrifice when space is tight. */
+  .file-bar-name {
+    font-size: 12px;
+    min-width: 0;
+  }
+  .read {
+    padding: 16px 16px 64px;
+  }
+
+  /* Split view stacks vertically — side-by-side panes are unusable this narrow.
+   * Applies to both the in-file editor/preview split and multi-file panes. */
+  .split,
+  .panes {
+    flex-direction: column;
+  }
+  /* Multi-file panes always get a top divider when stacked on mobile. */
+  .panes > .pane + .pane {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Floating windows get edge margins so they never touch the screen sides. */
+  .palette,
+  .settings-window {
+    max-width: calc(100vw - 24px);
+  }
+}
+
+/* Very small phones: hide the workspace name so the header never overflows
+ * (the title still shows it on hover via the element's `title`). */
+@media (max-width: 420px) {
+  .workspace-name {
+    display: none;
+  }
 }
