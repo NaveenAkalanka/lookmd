@@ -578,6 +578,96 @@ body {
   font-size: 14px;
 }
 
+/* --- Animations ---------------------------------------------------------- */
+/* All durations are intentionally short — these smooth over state changes,
+ * not call attention to themselves. Reduced-motion users get instant switches. */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+/* App shell — hides the flash of unstyled/loading content on first paint */
+.app { animation: fade-in 0.18s ease-out both; }
+
+/* Overlays */
+.settings-backdrop  { animation: fade-in  0.14s ease-out both; }
+.settings-window    { animation: scale-in 0.16s ease-out both; }
+.palette-backdrop   { animation: fade-in  0.12s ease-out both; }
+.palette            { animation: scale-in 0.14s ease-out both; }
+.context-menu       { animation: scale-in 0.10s ease-out both; transform-origin: top left; }
+.search-window      { animation: scale-in 0.15s ease-out both; }
+.sidebar-backdrop   { animation: fade-in  0.12s ease-out both; }
+
+/* Dropdowns / popovers */
+.menu-pop    { animation: slide-down 0.10s ease-out both; }
+.create-pop  { animation: scale-in  0.10s ease-out both; transform-origin: top left; }
+
+/* File content — fades in when a file loads or the mode switches */
+.read         { animation: fade-in 0.14s ease-out both; }
+.source-wrap,
+.source:not(.source-nowrap) { animation: fade-in 0.14s ease-out both; }
+.editor       { animation: fade-in 0.12s ease-out both; }
+
+/* Tree items slide up gently when the tree (re)loads */
+.tree > li    { animation: slide-up 0.12s ease-out both; }
+
+/* Loading shimmer for the tree skeleton text */
+.sidebar-loading {
+  background: linear-gradient(
+    90deg,
+    var(--border) 25%,
+    color-mix(in srgb, var(--accent) 12%, var(--border)) 50%,
+    var(--border) 75%
+  );
+  background-size: 200% auto;
+  animation: shimmer 1.2s linear infinite;
+  border-radius: 4px;
+  height: 10px;
+  margin: 6px 12px;
+}
+
+/* Global UI transitions — buttons, inputs, tree rows, tabs */
+button, .btn, input[type='text'], input[type='search'], select {
+  transition: background 0.10s ease, border-color 0.10s ease,
+              color 0.10s ease, box-shadow 0.10s ease, opacity 0.10s ease;
+}
+.tree-row-wrap  { transition: background 0.08s ease; }
+.tab            { transition: background 0.10s ease, border-color 0.10s ease,
+                              color 0.10s ease; }
+.theme-card     { transition: border-color 0.12s ease, box-shadow 0.12s ease,
+                              color 0.12s ease; }
+.tree-chevron   { transition: transform 0.12s ease; }
+.tree-action    { transition: color 0.08s ease, opacity 0.08s ease; }
+.topbar-btn, .icon-btn { transition: background 0.10s ease, color 0.10s ease; }
+.sidebar        { transition: box-shadow 0.15s ease; }
+.pane           { transition: box-shadow 0.12s ease; }
+
+/* Respect the user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* --- Scrollbars ---------------------------------------------------------- */
 /* Token-driven, theme-aware scrollbars (mixed from --text/--border so each
  * theme gets a fitting tone). Firefox uses the standard properties; Chromium/

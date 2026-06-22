@@ -1051,7 +1051,14 @@ export function App() {
               {actionError} <span className="muted">(dismiss)</span>
             </p>
           )}
-          {treeLoading && <p className="muted sidebar-empty">Loading…</p>}
+          {treeLoading && (
+            <div aria-busy="true" aria-label="Loading files">
+              <div className="sidebar-loading" style={{ width: '72%' }} />
+              <div className="sidebar-loading" style={{ width: '55%' }} />
+              <div className="sidebar-loading" style={{ width: '80%' }} />
+              <div className="sidebar-loading" style={{ width: '45%' }} />
+            </div>
+          )}
           {treeError && <p className="error sidebar-empty">{treeError}</p>}
           {!treeLoading && !treeError && (
             <FileTree
