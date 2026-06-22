@@ -10,6 +10,7 @@
 const THEME_KEY = 'lookmd.theme';
 const FONTS_KEY = 'lookmd.fonts';
 const SIDEBAR_KEY = 'lookmd.sidebar';
+const SIDEBAR_WIDTH_KEY = 'lookmd.sidebarWidth';
 const LINE_NUMBERS_KEY = 'lookmd.lineNumbers';
 
 export type ThemeId = 'paper' | 'daylight' | 'slate' | 'sanctum';
@@ -63,6 +64,15 @@ export interface SidebarPref {
 
 export const DEFAULT_SIDEBAR: SidebarPref = { collapsed: false, autoHide: false };
 
+/** Sidebar width is drag-resizable; the value is clamped to this range. */
+export const SIDEBAR_WIDTH_MIN = 200;
+export const SIDEBAR_WIDTH_MAX = 520;
+export const DEFAULT_SIDEBAR_WIDTH = 260;
+
+function clampWidth(px: number): number {
+  return Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, Math.round(px)));
+}
+
 function readRaw(key: string): string | null {
   try {
     return localStorage.getItem(key);
@@ -114,6 +124,15 @@ export function getSidebar(): SidebarPref {
 
 export function setSidebar(pref: SidebarPref): void {
   writeRaw(SIDEBAR_KEY, JSON.stringify(pref));
+}
+
+export function getSidebarWidth(): number {
+  const n = parseInt(readRaw(SIDEBAR_WIDTH_KEY) ?? '', 10);
+  return Number.isFinite(n) ? clampWidth(n) : DEFAULT_SIDEBAR_WIDTH;
+}
+
+export function setSidebarWidth(px: number): void {
+  writeRaw(SIDEBAR_WIDTH_KEY, String(clampWidth(px)));
 }
 
 /** Show line numbers in Source mode and the editor gutter. Defaults on. */

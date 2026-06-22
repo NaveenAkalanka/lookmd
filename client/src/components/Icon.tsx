@@ -11,8 +11,18 @@ import type { IconSvgElement } from '@hugeicons/react';
 interface Props {
   icon: IconSvgElement;
   size?: number;
+  className?: string;
 }
 
-export function Icon({ icon, size = 18 }: Props) {
-  return <HugeiconsIcon icon={icon} size={size} strokeWidth={1.8} aria-hidden focusable={false} />;
+export function Icon({ icon, size = 18, className }: Props) {
+  return (
+    <HugeiconsIcon
+      icon={icon}
+      size={size}
+      strokeWidth={1.8}
+      className={className}
+      aria-hidden
+      focusable={false}
+    />
+  );
 }
