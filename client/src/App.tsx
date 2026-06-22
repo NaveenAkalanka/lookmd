@@ -35,6 +35,7 @@ import {
   Settings01Icon,
   PinIcon,
   Cancel01Icon,
+  RefreshIcon,
   LayoutRightIcon,
   LayoutTwoColumnIcon,
   LayoutTwoRowIcon,
@@ -969,6 +970,14 @@ export function App() {
               onClick={() => changeSidebar({ ...sidebar, autoHide: !sidebar.autoHide })}
             >
               <Icon icon={PinIcon} size={16} />
+            </button>
+            <button
+              className="tree-action"
+              title="Refresh file tree"
+              aria-label="Refresh file tree"
+              onClick={() => void loadTree()}
+            >
+              <Icon icon={RefreshIcon} size={16} />
             </button>
             <CreateMenu
               dir=""
