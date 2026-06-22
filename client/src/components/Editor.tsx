@@ -16,7 +16,10 @@ import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, Prec } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { undo, redo } from '@codemirror/commands';
+import { openSearchPanel } from '@codemirror/search';
 import { tags as t } from '@lezer/highlight';
+import type { EditorApi } from '../editorApi';
 
 interface Props {
   /** Current buffer contents (the draft). */
@@ -28,6 +31,12 @@ interface Props {
   onSave: () => void;
   /** Show the line-number gutter (default true). */
   lineNumbers?: boolean;
+  /** Report this editor's command API when it gains focus (for the Edit menu). */
+  onFocusApi?: (api: EditorApi) => void;
+  /** Called on unmount so the app can drop this editor if it was the focused one. */
+  onReleaseApi?: (api: EditorApi) => void;
+  /** Bump `nonce` to scroll/select a 1-based line (e.g. from Find-in-Files). */
+  reveal?: { line: number; nonce: number };
 }
 
 /** A CodeMirror theme whose every value points at a lookmd CSS variable. */
@@ -62,6 +71,73 @@ const themeFromTokens = EditorView.theme({
     backgroundColor: 'color-mix(in srgb, var(--accent) 7%, transparent)',
     color: 'var(--text-secondary)',
   },
+  // Find/replace highlights.
+  '.cm-searchMatch': {
+    backgroundColor: 'color-mix(in srgb, var(--accent-2) 26%, transparent)',
+    borderRadius: '2px',
+  },
+  '.cm-searchMatch.cm-searchMatch-selected': {
+    backgroundColor: 'color-mix(in srgb, var(--accent-2) 48%, transparent)',
+  },
+  '.cm-selectionMatch': {
+    backgroundColor: 'color-mix(in srgb, var(--accent) 14%, transparent)',
+  },
+  // The find/replace panel — themed to match the rest of the chrome.
+  '.cm-panels': {
+    backgroundColor: 'var(--surface)',
+    color: 'var(--text-primary)',
+  },
+  '.cm-panels.cm-panels-bottom': { borderTop: '1px solid var(--border)' },
+  '.cm-panels.cm-panels-top': { borderBottom: '1px solid var(--border)' },
+  '.cm-panel.cm-search': {
+    padding: '7px 8px',
+    fontFamily: 'var(--font-ui)',
+    fontSize: '12px',
+  },
+  '.cm-panel.cm-search label': {
+    fontSize: '12px',
+    color: 'var(--text-secondary)',
+  },
+  '.cm-textfield': {
+    backgroundColor: 'var(--background)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    borderRadius: '5px',
+    padding: '3px 6px',
+    fontFamily: 'var(--font-ui)',
+  },
+  '.cm-textfield:focus': { outline: 'none', borderColor: 'var(--accent)' },
+  '.cm-button': {
+    backgroundColor: 'var(--surface)',
+    backgroundImage: 'none',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border)',
+    borderRadius: '5px',
+    padding: '3px 9px',
+    fontFamily: 'var(--font-ui)',
+    cursor: 'pointer',
+  },
+  '.cm-button:hover': { borderColor: 'var(--accent)' },
+  '.cm-button:active': {
+    backgroundColor: 'color-mix(in srgb, var(--accent) 14%, transparent)',
+  },
+  '.cm-panel.cm-search [name="close"]': {
+    color: 'var(--text-tertiary)',
+    cursor: 'pointer',
+    fontSize: '16px',
+  },
+  '.cm-panel.cm-search [name="close"]:hover': { color: 'var(--text-primary)' },
+  // Autocomplete popup.
+  '.cm-tooltip': {
+    backgroundColor: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: '6px',
+    color: 'var(--text-primary)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    backgroundColor: 'color-mix(in srgb, var(--accent) 20%, transparent)',
+    color: 'var(--text-primary)',
+  },
 });
 
 /**
@@ -94,7 +170,16 @@ const lookmdHighlightStyle = HighlightStyle.define([
   { tag: t.invalid, color: 'var(--danger)' },
 ]);
 
-export function Editor({ value, docKey, onChange, onSave, lineNumbers = true }: Props) {
+export function Editor({
+  value,
+  docKey,
+  onChange,
+  onSave,
+  lineNumbers = true,
+  onFocusApi,
+  onReleaseApi,
+  reveal,
+}: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -103,9 +188,59 @@ export function Editor({ value, docKey, onChange, onSave, lineNumbers = true }: 
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   const valueRef = useRef(value);
+  const onFocusApiRef = useRef(onFocusApi);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
   valueRef.current = value;
+  onFocusApiRef.current = onFocusApi;
+
+  // A stable command API for the Edit menu, bound to this editor's view.
+  const apiRef = useRef<EditorApi | null>(null);
+  if (!apiRef.current) {
+    const withView = (fn: (view: EditorView) => void) => () => {
+      const view = viewRef.current;
+      if (!view) return;
+      fn(view);
+    };
+    apiRef.current = {
+      undo: withView((view) => {
+        undo(view);
+        view.focus();
+      }),
+      redo: withView((view) => {
+        redo(view);
+        view.focus();
+      }),
+      copy: withView((view) => {
+        const { from, to } = view.state.selection.main;
+        const text = view.state.sliceDoc(from, to);
+        if (text) void navigator.clipboard?.writeText(text);
+        view.focus();
+      }),
+      cut: withView((view) => {
+        const { from, to } = view.state.selection.main;
+        const text = view.state.sliceDoc(from, to);
+        if (text) {
+          void navigator.clipboard?.writeText(text);
+          view.dispatch({ changes: { from, to }, scrollIntoView: true });
+        }
+        view.focus();
+      }),
+      paste: withView((view) => {
+        void navigator.clipboard?.readText().then((text) => {
+          if (text) view.dispatch(view.state.replaceSelection(text));
+          view.focus();
+        });
+      }),
+      find: withView((view) => {
+        openSearchPanel(view);
+      }),
+      replace: withView((view) => {
+        openSearchPanel(view);
+      }),
+      focus: withView((view) => view.focus()),
+    };
+  }
 
   // Build the editor once.
   useEffect(() => {
@@ -139,17 +274,39 @@ export function Editor({ value, docKey, onChange, onSave, lineNumbers = true }: 
             if (update.docChanged) {
               onChangeRef.current(update.state.doc.toString());
             }
+            // Register as the active editor for the Edit menu on focus.
+            if (update.focusChanged && update.view.hasFocus && apiRef.current) {
+              onFocusApiRef.current?.(apiRef.current);
+            }
           }),
         ],
       }),
     });
     viewRef.current = view;
+    // Register immediately so the menu works even before the first click.
+    if (apiRef.current) onFocusApiRef.current?.(apiRef.current);
 
     return () => {
+      if (apiRef.current) onReleaseApi?.(apiRef.current);
       view.destroy();
       viewRef.current = null;
     };
-  }, []);
+  }, [onReleaseApi]);
+
+  // Scroll to and select a line on demand (Find-in-Files result navigation).
+  const lastReveal = useRef(0);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !reveal || reveal.nonce === lastReveal.current) return;
+    lastReveal.current = reveal.nonce;
+    const lineNo = Math.min(Math.max(1, reveal.line), view.state.doc.lines);
+    const line = view.state.doc.line(lineNo);
+    view.dispatch({
+      selection: { anchor: line.from, head: line.to },
+      scrollIntoView: true,
+    });
+    view.focus();
+  }, [reveal]);
 
   // Replace the document when a different file is opened. We compare identity
   // (docKey), not content, so a save that returns the same text won't reset the
