@@ -21,6 +21,10 @@
   --border: #e3dccf;
   --danger: #b3261e;
 
+  /* Brand: the wordmark star is constant orange across every theme (its text
+   * recolors via currentColor); not overridden in any [data-theme] block. */
+  --brand-star: #ee6e4f;
+
   /* Syntax palette — one set per theme, shared by all three modes (the
    * CodeMirror editor, rendered code blocks, and the raw-source view). */
   --syntax-keyword: #9d2f5e;
@@ -241,8 +245,14 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .brand {
-  font-weight: 700;
-  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Wordmark letterforms paint with currentColor; the star carries its own fill. */
+.logo {
+  color: var(--text-primary);
+  display: block;
 }
 .workspace-name {
   flex: 1;
@@ -1044,10 +1054,10 @@ body {
   border-radius: 12px;
   padding: 28px 32px;
 }
-.picker-title {
-  margin: 0;
-  color: var(--accent);
-  font-size: 28px;
+.picker-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 .picker-subtitle {
   margin: 4px 0 20px;

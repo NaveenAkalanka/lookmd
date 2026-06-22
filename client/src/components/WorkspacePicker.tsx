@@ -28,6 +28,8 @@ import {
   type RecentWorkspace,
 } from '../storage';
 import { Icon } from './Icon';
+import { Logo } from './Logo';
+import { BrandIcon } from './BrandIcon';
 import { Folder01Icon, ComputerIcon, ArrowUp01Icon } from '@hugeicons/core-free-icons';
 
 interface Props {
@@ -109,7 +111,10 @@ export function WorkspacePicker({ onOpen }: Props) {
   return (
     <div className="picker">
       <div className="picker-card">
-        <h1 className="picker-title">lookmd</h1>
+        <div className="picker-brand">
+          <BrandIcon size={48} />
+          <Logo className="picker-logo" height={34} title="lookmd" />
+        </div>
         <p className="picker-subtitle">Open a folder to start reading and editing Markdown.</p>
 
         {error && <p className="error">{error}</p>}

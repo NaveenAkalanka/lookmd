@@ -28,6 +28,8 @@ import { FileTree } from './components/FileTree';
 import { CommandPalette } from './components/CommandPalette';
 import { Outline } from './components/Outline';
 import { Icon } from './components/Icon';
+import { Logo } from './components/Logo';
+import { BrandIcon } from './components/BrandIcon';
 import {
   Menu01Icon,
   Settings01Icon,
@@ -689,7 +691,10 @@ export function App() {
         >
           <Icon icon={Menu01Icon} />
         </button>
-        <span className="brand">lookmd</span>
+        <span className="brand" title="lookmd">
+          <BrandIcon size={22} />
+          <Logo height={18} />
+        </span>
         <span className="workspace-name" title={workspace.root || '/'}>
           {workspace.name}
         </span>
