@@ -25,21 +25,35 @@ export type ThemeId =
   | 'gruvbox'
   | 'rose-pine'
   | 'solarized'
-  | 'dracula';
+  | 'dracula'
+  | 'midnight'
+  | 'forest'
+  | 'obsidian'
+  | 'amber'
+  | 'espresso'
+  | 'cyberpunk';
 
-export const THEMES: { id: ThemeId; label: string }[] = [
-  { id: 'paper', label: 'Paper' },
-  { id: 'daylight', label: 'Daylight' },
+export const THEMES: { id: ThemeId; label: string; light?: boolean }[] = [
+  // — Light —
+  { id: 'paper', label: 'Paper', light: true },
+  { id: 'daylight', label: 'Daylight', light: true },
+  { id: 'latte', label: 'Latte', light: true },
+  { id: 'solarized', label: 'Solarized', light: true },
+  // — Dark —
   { id: 'slate', label: 'Slate' },
-  { id: 'sanctum', label: 'Sanctum' },
   { id: 'nord', label: 'Nord' },
   { id: 'mocha', label: 'Mocha' },
-  { id: 'latte', label: 'Latte' },
   { id: 'tokyo-night', label: 'Tokyo Night' },
-  { id: 'gruvbox', label: 'Gruvbox' },
-  { id: 'rose-pine', label: 'Rosé Pine' },
-  { id: 'solarized', label: 'Solarized' },
   { id: 'dracula', label: 'Dracula' },
+  { id: 'midnight', label: 'Midnight' },
+  { id: 'rose-pine', label: 'Rosé Pine' },
+  { id: 'gruvbox', label: 'Gruvbox' },
+  { id: 'obsidian', label: 'Obsidian' },
+  { id: 'sanctum', label: 'Sanctum' },
+  { id: 'forest', label: 'Forest' },
+  { id: 'amber', label: 'Amber' },
+  { id: 'espresso', label: 'Espresso' },
+  { id: 'cyberpunk', label: 'Cyberpunk' },
 ];
 
 const DEFAULT_THEME: ThemeId = 'paper';

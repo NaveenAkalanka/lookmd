@@ -392,6 +392,174 @@
   color-scheme: dark;
 }
 
+/* Midnight — deep navy, cool blue accents. */
+[data-theme='midnight'] {
+  --background: #0d1117;
+  --surface: #161b22;
+  --text-primary: #c9d1d9;
+  --text-secondary: #8b949e;
+  --text-tertiary: #484f58;
+  --accent: #58a6ff;
+  --accent-2: #79c0ff;
+  --border: #21262d;
+  --danger: #ff7b72;
+  --syntax-keyword: #ff7b72;
+  --syntax-string: #a5d6ff;
+  --syntax-comment: #484f58;
+  --syntax-number: #f2cc60;
+  --syntax-function: #d2a8ff;
+  --syntax-type: #79c0ff;
+  --syntax-constant: #f2cc60;
+  --syntax-variable: #c9d1d9;
+  --syntax-operator: #79c0ff;
+  --syntax-punctuation: #8b949e;
+  --syntax-property: #79c0ff;
+  --syntax-tag: #7ee787;
+  --syntax-heading: #58a6ff;
+  --syntax-link: #58a6ff;
+  color-scheme: dark;
+}
+
+/* Forest — dark green earth, organic. */
+[data-theme='forest'] {
+  --background: #0f1a10;
+  --surface: #192c1a;
+  --text-primary: #d4e6c3;
+  --text-secondary: #8daa7a;
+  --text-tertiary: #4d6a45;
+  --accent: #6abf5e;
+  --accent-2: #a3cf91;
+  --border: #2a3d22;
+  --danger: #f28b82;
+  --syntax-keyword: #6abf5e;
+  --syntax-string: #f9e2af;
+  --syntax-comment: #4d6a45;
+  --syntax-number: #fab387;
+  --syntax-function: #a3cf91;
+  --syntax-type: #89dceb;
+  --syntax-constant: #fab387;
+  --syntax-variable: #d4e6c3;
+  --syntax-operator: #6abf5e;
+  --syntax-punctuation: #4d6a45;
+  --syntax-property: #89dceb;
+  --syntax-tag: #f28b82;
+  --syntax-heading: #a3cf91;
+  --syntax-link: #6abf5e;
+  color-scheme: dark;
+}
+
+/* Obsidian — near-black, silver accents, minimal. */
+[data-theme='obsidian'] {
+  --background: #0a0a0a;
+  --surface: #141414;
+  --text-primary: #e2e2e2;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #505050;
+  --accent: #a78bfa;
+  --accent-2: var(--accent);
+  --border: #242424;
+  --danger: #f87171;
+  --syntax-keyword: #a78bfa;
+  --syntax-string: #86efac;
+  --syntax-comment: #505050;
+  --syntax-number: #fdba74;
+  --syntax-function: #93c5fd;
+  --syntax-type: #67e8f9;
+  --syntax-constant: #fdba74;
+  --syntax-variable: #e2e2e2;
+  --syntax-operator: #c4b5fd;
+  --syntax-punctuation: #a0a0a0;
+  --syntax-property: #93c5fd;
+  --syntax-tag: #f9a8d4;
+  --syntax-heading: #a78bfa;
+  --syntax-link: #93c5fd;
+  color-scheme: dark;
+}
+
+/* Amber — dark amber, warm siennas and golds. */
+[data-theme='amber'] {
+  --background: #1a1208;
+  --surface: #261b0c;
+  --text-primary: #f5e6c8;
+  --text-secondary: #c9a46a;
+  --text-tertiary: #7a5c2e;
+  --accent: #f59e0b;
+  --accent-2: #fcd34d;
+  --border: #3d2a10;
+  --danger: #ef4444;
+  --syntax-keyword: #f59e0b;
+  --syntax-string: #86efac;
+  --syntax-comment: #7a5c2e;
+  --syntax-number: #fcd34d;
+  --syntax-function: #fbbf24;
+  --syntax-type: #6ee7b7;
+  --syntax-constant: #fcd34d;
+  --syntax-variable: #f5e6c8;
+  --syntax-operator: #f59e0b;
+  --syntax-punctuation: #7a5c2e;
+  --syntax-property: #6ee7b7;
+  --syntax-tag: #f87171;
+  --syntax-heading: #fcd34d;
+  --syntax-link: #f59e0b;
+  color-scheme: dark;
+}
+
+/* Espresso — rich coffee browns, warm and cosy. */
+[data-theme='espresso'] {
+  --background: #1b1510;
+  --surface: #261e16;
+  --text-primary: #e8d5b7;
+  --text-secondary: #b89e80;
+  --text-tertiary: #6b5540;
+  --accent: #d4956a;
+  --accent-2: #e8c49a;
+  --border: #3a2d20;
+  --danger: #e05555;
+  --syntax-keyword: #d4956a;
+  --syntax-string: #a8c97e;
+  --syntax-comment: #6b5540;
+  --syntax-number: #e8c49a;
+  --syntax-function: #c49a5e;
+  --syntax-type: #86b5a0;
+  --syntax-constant: #e8c49a;
+  --syntax-variable: #e8d5b7;
+  --syntax-operator: #d4956a;
+  --syntax-punctuation: #6b5540;
+  --syntax-property: #86b5a0;
+  --syntax-tag: #e05555;
+  --syntax-heading: #e8c49a;
+  --syntax-link: #d4956a;
+  color-scheme: dark;
+}
+
+/* Cyberpunk — dark charcoal with electric magenta and cyan. */
+[data-theme='cyberpunk'] {
+  --background: #0d0d14;
+  --surface: #14141f;
+  --text-primary: #e0e0f0;
+  --text-secondary: #9090b0;
+  --text-tertiary: #505070;
+  --accent: #e040fb;
+  --accent-2: #00e5ff;
+  --border: #222235;
+  --danger: #ff1744;
+  --syntax-keyword: #e040fb;
+  --syntax-string: #00e5ff;
+  --syntax-comment: #505070;
+  --syntax-number: #ffea00;
+  --syntax-function: #00e5ff;
+  --syntax-type: #69ff47;
+  --syntax-constant: #ffea00;
+  --syntax-variable: #e0e0f0;
+  --syntax-operator: #e040fb;
+  --syntax-punctuation: #9090b0;
+  --syntax-property: #00e5ff;
+  --syntax-tag: #ff1744;
+  --syntax-heading: #e040fb;
+  --syntax-link: #00e5ff;
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1155,21 +1323,21 @@ body.resizing-col .sidebar {
   inset: 0;
   z-index: 100;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 9vh 16px 16px;
-  background: color-mix(in srgb, #000 42%, transparent);
+  padding: 24px 16px;
+  background: color-mix(in srgb, #000 52%, transparent);
 }
 .settings-window {
-  width: 340px;
-  max-width: 100%;
-  max-height: 82vh;
+  width: 780px;
+  max-width: calc(100vw - 32px);
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.4);
+  border-radius: 14px;
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.5);
   overflow: hidden;
 }
 .settings-window-head {
@@ -1177,12 +1345,29 @@ body.resizing-col .sidebar {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 12px 12px 16px;
+  padding: 14px 14px 14px 20px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .settings-window-body {
-  padding: 16px;
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  overflow: hidden;
+}
+/* Left panel: scrollable theme gallery */
+.settings-pane-themes {
+  width: 460px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
   overflow: auto;
+  padding: 20px;
+}
+/* Right panel: fonts + misc options */
+.settings-pane-options {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
 }
 
 /* --- Find / Replace in Files -------------------------------------------- */
@@ -1268,11 +1453,12 @@ body.resizing-col .sidebar {
 }
 .settings-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text-primary);
 }
 .settings-section {
-  margin-top: 14px;
+  margin-top: 20px;
 }
 .settings-section:first-of-type {
   margin-top: 0;
@@ -1281,56 +1467,115 @@ body.resizing-col .sidebar {
   display: block;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: var(--text-tertiary);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 .theme-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
 }
-.theme-chip {
+/* Card-style theme picker: mini app-window preview + label */
+.theme-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  background: var(--background);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 7px 9px;
-  font-family: var(--font-ui);
-  font-size: 13px;
-  color: var(--text-primary);
+  gap: 7px;
+  padding: 10px 8px 9px;
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
   cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: border-color 0.12s, color 0.12s;
 }
-.theme-chip:hover {
+.theme-card:hover {
   border-color: var(--accent);
+  color: var(--text-primary);
 }
-.theme-chip-active {
+.theme-card-active {
   border-color: var(--accent);
-  outline: 1px solid var(--accent);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
 }
-.theme-swatch {
-  display: inline-flex;
-  width: 34px;
-  height: 22px;
-  border-radius: 5px;
+/* Mini app-window preview scoped to each theme's own tokens */
+.theme-preview {
+  width: 100px;
+  height: 64px;
+  border-radius: 6px;
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--background);
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
 }
-.theme-swatch-bg {
-  flex: 1;
+.theme-preview-topbar {
+  height: 13px;
   background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  gap: 3px;
 }
-.theme-swatch-accent {
-  flex: 1;
-  background: var(--accent);
+.theme-preview-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
 }
-.theme-swatch-accent2 {
+.theme-preview-dot:first-child { background: var(--accent); }
+.theme-preview-body {
   flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+.theme-preview-sidebar {
+  width: 24px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 3px;
+  gap: 3px;
+}
+.theme-preview-sidebar-line {
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text-tertiary);
+}
+.theme-preview-sidebar-line:first-child {
   background: var(--accent-2);
+  width: 70%;
+}
+.theme-preview-content {
+  flex: 1;
+  padding: 5px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3.5px;
+  background: var(--background);
+}
+.theme-preview-content-line {
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text-tertiary);
+}
+.theme-preview-content-line:first-child {
+  height: 3px;
+  background: var(--accent-2);
+  width: 55%;
+}
+.theme-preview-content-line:last-child {
+  background: var(--accent);
+  width: 35%;
 }
 .setting-block {
   margin-bottom: 10px;
@@ -1910,6 +2155,22 @@ body.resizing-col .sidebar {
   .palette,
   .settings-window {
     max-width: calc(100vw - 24px);
+  }
+  /* Stack theme gallery above options on narrow screens */
+  .settings-window-body {
+    flex-direction: column;
+  }
+  .settings-pane-themes {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .theme-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .theme-preview {
+    width: 80px;
+    height: 52px;
   }
 }
 

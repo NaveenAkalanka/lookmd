@@ -1,8 +1,7 @@
 /**
- * Appearance settings as a floating window: theme picker + reading/mono font
- * choosers, centered over a dim backdrop. Pure UI — it reports changes upward;
- * persistence and application live in `settings.ts`. Closes on backdrop click,
- * the close button, or Escape.
+ * Appearance settings as a spacious floating dialog: theme gallery on the left,
+ * fonts and editor options on the right. Scoped `data-theme` on each card
+ * renders a live mini-preview of that theme's tokens without touching the page.
  */
 
 import { useEffect, useState } from 'react';
@@ -49,6 +48,9 @@ export function SettingsPanel({
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const lightThemes = THEMES.filter((t) => t.light);
+  const darkThemes = THEMES.filter((t) => !t.light);
+
   return (
     <div className="settings-backdrop" onMouseDown={onClose}>
       <div
@@ -61,74 +63,127 @@ export function SettingsPanel({
         <div className="settings-window-head">
           <h2 className="settings-title">Appearance</h2>
           <button className="btn icon-btn" aria-label="Close settings" onClick={onClose}>
-            <Icon icon={Cancel01Icon} size={16} />
+            <Icon icon={Cancel01Icon} size={18} />
           </button>
         </div>
+
         <div className="settings-window-body">
-          <section className="settings-section">
-        <span className="settings-heading">Theme</span>
-        <div className="theme-grid">
-          {THEMES.map((t) => (
-            <button
-              key={t.id}
-              className={`theme-chip${theme === t.id ? ' theme-chip-active' : ''}`}
-              aria-pressed={theme === t.id}
-              onClick={() => onTheme(t.id)}
-            >
-              <span className="theme-swatch" data-theme={t.id}>
-                <span className="theme-swatch-bg" />
-                <span className="theme-swatch-accent" />
-                <span className="theme-swatch-accent2" />
-              </span>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </section>
+          {/* ── Left: Theme gallery ── */}
+          <div className="settings-pane-themes">
+            <span className="settings-heading">Light</span>
+            <div className="theme-grid">
+              {lightThemes.map((t) => (
+                <ThemeCard
+                  key={t.id}
+                  id={t.id}
+                  label={t.label}
+                  active={theme === t.id}
+                  onSelect={onTheme}
+                />
+              ))}
+            </div>
 
-      <section className="settings-section">
-        <span className="settings-heading">Fonts</span>
-        <FontPicker
-          label="Reading"
-          value={fonts.read}
-          options={READING_FONTS}
-          onChange={(read) => onFonts({ ...fonts, read })}
-        />
-        <FontPicker
-          label="Editor / mono"
-          value={fonts.mono}
-          options={MONO_FONTS}
-          onChange={(mono) => onFonts({ ...fonts, mono })}
-        />
-      </section>
+            <span className="settings-heading" style={{ marginTop: 20, display: 'block' }}>Dark</span>
+            <div className="theme-grid">
+              {darkThemes.map((t) => (
+                <ThemeCard
+                  key={t.id}
+                  id={t.id}
+                  label={t.label}
+                  active={theme === t.id}
+                  onSelect={onTheme}
+                />
+              ))}
+            </div>
+          </div>
 
-      <section className="settings-section">
-        <span className="settings-heading">Sidebar</span>
-        <label className="setting-check">
-          <input
-            type="checkbox"
-            checked={sidebar.autoHide}
-            onChange={(e) => onSidebar({ ...sidebar, autoHide: e.target.checked })}
-          />
-          Auto-hide — reveal on hover at the left edge
-        </label>
-        <p className="setting-hint">Toggle the sidebar anytime from the toolbar or with Ctrl/Cmd-B.</p>
-          </section>
-
-          <section className="settings-section">
-            <span className="settings-heading">Editor</span>
-            <label className="setting-check">
-              <input
-                type="checkbox"
-                checked={lineNumbers}
-                onChange={(e) => onLineNumbers(e.target.checked)}
+          {/* ── Right: Options ── */}
+          <div className="settings-pane-options">
+            <section className="settings-section">
+              <span className="settings-heading">Fonts</span>
+              <FontPicker
+                label="Reading"
+                value={fonts.read}
+                options={READING_FONTS}
+                onChange={(read) => onFonts({ ...fonts, read })}
               />
-              Show line numbers (Source &amp; Edit)
-            </label>
-          </section>
+              <FontPicker
+                label="Editor / mono"
+                value={fonts.mono}
+                options={MONO_FONTS}
+                onChange={(mono) => onFonts({ ...fonts, mono })}
+              />
+            </section>
+
+            <section className="settings-section">
+              <span className="settings-heading">Sidebar</span>
+              <label className="setting-check">
+                <input
+                  type="checkbox"
+                  checked={sidebar.autoHide}
+                  onChange={(e) => onSidebar({ ...sidebar, autoHide: e.target.checked })}
+                />
+                Auto-hide — reveal on hover at the left edge
+              </label>
+              <p className="setting-hint">Toggle anytime with Ctrl/Cmd-B.</p>
+            </section>
+
+            <section className="settings-section">
+              <span className="settings-heading">Editor</span>
+              <label className="setting-check">
+                <input
+                  type="checkbox"
+                  checked={lineNumbers}
+                  onChange={(e) => onLineNumbers(e.target.checked)}
+                />
+                Show line numbers (Source &amp; Edit)
+              </label>
+            </section>
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+interface ThemeCardProps {
+  id: ThemeId;
+  label: string;
+  active: boolean;
+  onSelect: (id: ThemeId) => void;
+}
+
+function ThemeCard({ id, label, active, onSelect }: ThemeCardProps) {
+  return (
+    <button
+      className={`theme-card${active ? ' theme-card-active' : ''}`}
+      aria-pressed={active}
+      onClick={() => onSelect(id)}
+      title={label}
+    >
+      {/* Mini app-window preview, inherits this theme's CSS tokens */}
+      <span className="theme-preview" data-theme={id}>
+        <span className="theme-preview-topbar">
+          <span className="theme-preview-dot" />
+          <span className="theme-preview-dot" />
+          <span className="theme-preview-dot" />
+        </span>
+        <span className="theme-preview-body">
+          <span className="theme-preview-sidebar">
+            <span className="theme-preview-sidebar-line" />
+            <span className="theme-preview-sidebar-line" />
+            <span className="theme-preview-sidebar-line" />
+          </span>
+          <span className="theme-preview-content">
+            <span className="theme-preview-content-line" />
+            <span className="theme-preview-content-line" />
+            <span className="theme-preview-content-line" />
+            <span className="theme-preview-content-line" />
+          </span>
+        </span>
+      </span>
+      {label}
+    </button>
   );
 }
 
