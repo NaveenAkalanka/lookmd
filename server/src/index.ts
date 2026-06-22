@@ -7,11 +7,13 @@
 
 import { loadConfig } from './config.ts';
 import { buildApp } from './app.ts';
+import { attachWatcher } from './watcher.ts';
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const app = buildApp(config);
   await app.listen({ host: config.host, port: config.port });
+  attachWatcher(app.server, config.base);
   // eslint-disable-next-line no-console
   console.log(
     `lookmd server listening on http://${config.host}:${config.port}\n` +

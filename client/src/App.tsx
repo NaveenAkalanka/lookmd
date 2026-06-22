@@ -344,6 +344,66 @@ export function App() {
     void loadTree();
   }, [loadTree]);
 
+  // Live file-watching over WebSocket (REST source only; FSA is client-side).
+  // Reconnects automatically with a short backoff so a server restart heals
+  // itself without a page reload.
+  const loadTreeRef = useRef(loadTree);
+  loadTreeRef.current = loadTree;
+
+  // Stable ref so the WS handler always sees fresh tabs + source.
+  const wsChangeHandlerRef = useRef<(path: string) => void>(() => undefined);
+  wsChangeHandlerRef.current = (changedPath: string) => {
+    const t = tabs.find((tab) => tab.path === changedPath);
+    if (!t || !source) return;
+    if (tabDirty(t)) {
+      updateTab(t.path, { conflict: true });
+    } else {
+      fetchInto(source, t.path);
+    }
+  };
+
+  useEffect(() => {
+    if (!workspace || source?.kind !== 'rest') return;
+
+    let ws: WebSocket | null = null;
+    let dead = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let delay = 1500;
+
+    const connect = () => {
+      if (dead) return;
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${proto}//${location.host}/ws?root=${encodeURIComponent(workspace.root)}`);
+
+      ws.onmessage = (ev) => {
+        let msg: { type: string; path?: string };
+        try { msg = JSON.parse(ev.data as string) as typeof msg; } catch { return; }
+        if (msg.type === 'tree') void loadTreeRef.current();
+        else if (msg.type === 'change' && msg.path) wsChangeHandlerRef.current(msg.path);
+      };
+
+      ws.onclose = () => {
+        ws = null;
+        if (dead) return;
+        reconnectTimer = setTimeout(() => {
+          delay = Math.min(delay * 1.5, 15000);
+          connect();
+        }, delay);
+      };
+
+      ws.onerror = () => ws?.close();
+    };
+
+    connect();
+
+    return () => {
+      dead = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace, source?.kind]);
+
   // Warn on tab/window close while any open file has unsaved changes.
   useEffect(() => {
     if (!anyDirty) return;

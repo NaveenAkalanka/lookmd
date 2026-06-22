@@ -11,10 +11,13 @@
   },
   "dependencies": {
     "@lookmd/shared": "*",
-    "fastify": "^5.8.5"
+    "chokidar": "^5.0.0",
+    "fastify": "^5.8.5",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.7.0"
   }
 }
