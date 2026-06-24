@@ -17,6 +17,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
 import { remarkWikiLink } from '../markdown/remarkWikiLink';
+import { CodeBlock } from './CodeBlock';
 import { Icon } from './Icon';
 import { ImageNotFound01Icon } from '@hugeicons/core-free-icons';
 
@@ -37,6 +38,7 @@ function isExternalUrl(src: string): boolean {
 export function ReadView({ content, resolveImage, onNavigate }: Props) {
   const components = useMemo<Components>(() => {
     return {
+      pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
       img: ({ src, alt }) =>
         resolveImage ? (
           <MarkdownImage src={typeof src === 'string' ? src : ''} alt={alt} resolve={resolveImage} />
