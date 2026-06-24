@@ -4,7 +4,10 @@
  * built from a `Config` so tests can inject a temp BASE without a real socket.
  */
 
+import path from 'node:path';
+import fs from 'node:fs';
 import Fastify, { type FastifyInstance } from 'fastify';
+import fastifyStatic from '@fastify/static';
 
 import type {
   PutFileRequest,
@@ -105,6 +108,21 @@ export function buildApp(config: Config): FastifyInstance {
       const from = requireString(body.from, 'from');
       const to = requireString(body.to, 'to');
       return moveFile(config.base, root, from, to);
+    });
+  }
+
+  // Serve the built client (single-origin deploy). Enabled only when
+  // LOOKMD_STATIC_DIR points at the client build — dev and tests leave it unset,
+  // so they keep the pure-API behaviour. Non-asset GETs fall back to index.html
+  // so a refresh on any path still loads the SPA; /api and /ws keep JSON 404s.
+  const staticDir = process.env.LOOKMD_STATIC_DIR;
+  if (staticDir && fs.existsSync(staticDir)) {
+    app.register(fastifyStatic, { root: path.resolve(staticDir), wildcard: false });
+    app.setNotFoundHandler((req, reply) => {
+      if (req.method === 'GET' && !req.url.startsWith('/api') && !req.url.startsWith('/ws')) {
+        return reply.sendFile('index.html');
+      }
+      reply.code(404).send({ error: `not found: ${req.url}`, code: 'NOT_FOUND' });
     });
   }
 

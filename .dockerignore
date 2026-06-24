@@ -1,0 +1,16 @@
+# Build context hygiene — keep host artifacts and per-platform installs out of
+# the image (node_modules and dist are rebuilt inside the container).
+**/node_modules
+**/dist
+.git
+.gitignore
+*.log
+npm-debug.log*
+.DS_Store
+.vscode
+.idea
+.claude
+scratchpad
+Dockerfile
+.dockerignore
+SYNTAX-DEMO.md
