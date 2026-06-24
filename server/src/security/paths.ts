@@ -19,16 +19,15 @@
 
 import path from 'node:path';
 import fs from 'node:fs';
+import { ALL_TEXT_EXTENSIONS } from '@lookmd/shared';
 
-/** Extensions the server is willing to read or write. */
-export const ALLOWED_EXTENSIONS: ReadonlySet<string> = new Set([
-  '.md',
-  '.markdown',
-  '.mdown',
-  '.mkd',
-  '.txt',
-  '.text',
-]);
+/**
+ * Extensions the server is willing to read or write — the full plain-text set
+ * shared with the client (Markdown, plus code/config/data/shell text files).
+ * Every entry is plain text, so reading it through the same pipeline is safe;
+ * which of these the user actually *sees* is a client-side display preference.
+ */
+export const ALLOWED_EXTENSIONS: ReadonlySet<string> = new Set(ALL_TEXT_EXTENSIONS);
 
 export type PathErrorCode =
   | 'INVALID_PATH'

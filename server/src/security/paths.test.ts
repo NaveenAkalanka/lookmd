@@ -156,8 +156,14 @@ describe('file-type allowlist', () => {
     assert.equal(isAllowedFile('NOTES.TXT'), true);
   });
 
-  it('rejects non-text extensions', () => {
-    for (const name of ['image.png', 'a.exe', 'archive.zip', 'script.js']) {
+  it('accepts code/config/data text extensions', () => {
+    for (const name of ['script.js', 'app.ts', 'data.json', 'config.yaml', 'run.sh']) {
+      assert.equal(isAllowedFile(name), true, `expected ${name} allowed`);
+    }
+  });
+
+  it('rejects binary / non-text extensions', () => {
+    for (const name of ['image.png', 'a.exe', 'archive.zip', 'photo.jpg']) {
       assert.equal(isAllowedFile(name), false, `expected ${name} rejected`);
     }
   });

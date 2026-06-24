@@ -17,12 +17,15 @@ interface Props {
   mode: ViewMode;
   onChange: (mode: ViewMode) => void;
   disabled?: boolean;
+  /** Restrict which modes are offered. Defaults to all. */
+  available?: ViewMode[];
 }
 
-export function ModeToggle({ mode, onChange, disabled }: Props) {
+export function ModeToggle({ mode, onChange, disabled, available }: Props) {
+  const modes = available ? MODES.filter((m) => available.includes(m.id)) : MODES;
   return (
     <div className="segmented" role="tablist" aria-label="View mode">
-      {MODES.map((m) => (
+      {modes.map((m) => (
         <button
           key={m.id}
           role="tab"

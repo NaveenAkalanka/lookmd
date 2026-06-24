@@ -65,15 +65,30 @@ import {
   setSidebar as persistSidebar,
   setSidebarWidth as persistSidebarWidth,
   setLineNumbers as persistLineNumbers,
+  getZoom,
+  setZoom as persistZoom,
+  clampZoom,
+  ZOOM_STEP,
+  getFileTypes,
+  setFileTypes as persistFileTypes,
+  enabledExtensions,
+  filterTreeByFileTypes,
   SIDEBAR_WIDTH_MIN,
   SIDEBAR_WIDTH_MAX,
   type ThemeId,
   type Fonts,
   type SidebarPref,
 } from './settings';
+import { isMarkdownPath } from '@lookmd/shared';
 
 function baseName(path: string): string {
   return path.split('/').pop() ?? path;
+}
+
+/** Read/Split only make sense for Markdown; coerce other text files to Source. */
+function effectiveMode(path: string, mode: ViewMode): ViewMode {
+  if (isMarkdownPath(path)) return mode;
+  return mode === 'read' || mode === 'split' ? 'source' : mode;
 }
 
 /** Flatten the tree to just the file paths, for the quick-open palette. */
@@ -180,6 +195,8 @@ export function App() {
   // `peek` for the hover-reveal used in auto-hide mode.
   const [sidebar, setSidebarState] = useState<SidebarPref>(() => getSidebar());
   const [lineNumbers, setLineNumbersState] = useState<boolean>(() => getLineNumbers());
+  const [zoom, setZoomState] = useState<number>(() => getZoom());
+  const [fileTypes, setFileTypesState] = useState<string[]>(() => getFileTypes());
   const [peek, setPeek] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => getSidebarWidth());
 
@@ -205,6 +222,8 @@ export function App() {
     secondaryPath ? (tabs.find((t) => t.path === secondaryPath) ?? null) : null;
   const splitOn = secondaryTab !== null;
   const anyDirty = tabs.some(tabDirty);
+  // Stable identity for keying per-file annotations (localStorage only).
+  const workspaceKey = workspace ? `${workspace.kind}:${workspace.root}` : '';
 
   const updateTab = useCallback((path: string, patch: Partial<Tab>) => {
     setTabs((ts) => ts.map((t) => (t.path === path ? { ...t, ...patch } : t)));
@@ -274,6 +293,36 @@ export function App() {
     setLineNumbersState(on);
     persistLineNumbers(on);
   }, []);
+  const changeZoom = useCallback((next: number) => {
+    const z = clampZoom(next);
+    setZoomState(z);
+    persistZoom(z);
+  }, []);
+  const zoomIn = useCallback(() => setZoomState((z) => {
+    const n = clampZoom(z + ZOOM_STEP);
+    persistZoom(n);
+    return n;
+  }), []);
+  const zoomOut = useCallback(() => setZoomState((z) => {
+    const n = clampZoom(z - ZOOM_STEP);
+    persistZoom(n);
+    return n;
+  }), []);
+  const zoomReset = useCallback(() => changeZoom(1), [changeZoom]);
+  const changeFileTypes = useCallback((ids: string[]) => {
+    setFileTypesState(ids);
+    persistFileTypes(ids);
+  }, []);
+
+  // The tree as displayed: pruned to the file types the user has enabled. The
+  // server still serves every allowed text type; this is purely what we show.
+  const visibleExts = useMemo(() => enabledExtensions(fileTypes), [fileTypes]);
+  const filteredTree = useMemo(
+    () => filterTreeByFileTypes(tree, visibleExts),
+    [tree, visibleExts],
+  );
+  const visibleFiles = useMemo(() => flattenFiles(filteredTree), [filteredTree]);
+
   const toggleSidebar = useCallback(() => {
     if (isMobile) setDrawerOpen((o) => !o);
     else if (sidebar.autoHide) setPeek((p) => !p);
@@ -584,6 +633,26 @@ export function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  // Ctrl/Cmd +/-/0 zoom the content (Read/Source/Edit), like a browser but scoped.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const k = e.key;
+      if (k === '=' || k === '+' || k === 'Add') {
+        e.preventDefault();
+        zoomIn();
+      } else if (k === '-' || k === '_' || k === 'Subtract') {
+        e.preventDefault();
+        zoomOut();
+      } else if (k === '0') {
+        e.preventDefault();
+        zoomReset();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [zoomIn, zoomOut, zoomReset]);
 
   // Ctrl/Cmd-Shift-F / -H open workspace Find / Replace in Files.
   useEffect(() => {
@@ -945,10 +1014,12 @@ export function App() {
       fonts={fonts}
       sidebar={sidebar}
       lineNumbers={lineNumbers}
+      fileTypes={fileTypes}
       onTheme={changeTheme}
       onFonts={changeFonts}
       onSidebar={changeSidebar}
       onLineNumbers={changeLineNumbers}
+      onFileTypes={changeFileTypes}
       onClose={() => setSettingsOpen(false)}
     />
   );
@@ -964,7 +1035,10 @@ export function App() {
   }
 
   return (
-    <div className="app" style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}>
+    <div
+      className="app"
+      style={{ '--sidebar-width': `${sidebarWidth}px`, '--zoom': zoom } as React.CSSProperties}
+    >
       <header className="topbar">
         <button
           className="btn icon-btn"
@@ -1062,7 +1136,7 @@ export function App() {
           {treeError && <p className="error sidebar-empty">{treeError}</p>}
           {!treeLoading && !treeError && (
             <FileTree
-              tree={tree}
+              tree={filteredTree}
               activePath={activePath}
               onOpenFile={openFile}
               onNewFile={(dir, ext) => void newFile(dir, ext)}
@@ -1139,9 +1213,14 @@ export function App() {
             <div className={`panes panes-${splitDir}`}>
               <FilePane
                 tab={activeTab}
-                mode={mode}
+                mode={effectiveMode(activeTab.path, mode)}
                 onMode={setMode}
                 lineNumbers={lineNumbers}
+                zoom={zoom}
+                onZoomIn={zoomIn}
+                onZoomOut={zoomOut}
+                onZoomReset={zoomReset}
+                workspaceKey={workspaceKey}
                 docKey={docKeyFor(activeTab)}
                 resolveImage={primaryResolveImage}
                 onNavigate={primaryNavigate}
@@ -1183,9 +1262,14 @@ export function App() {
               {secondaryTab && (
                 <FilePane
                   tab={secondaryTab}
-                  mode={secondaryMode}
+                  mode={effectiveMode(secondaryTab.path, secondaryMode)}
                   onMode={setSecondaryMode}
                   lineNumbers={lineNumbers}
+                  zoom={zoom}
+                  onZoomIn={zoomIn}
+                  onZoomOut={zoomOut}
+                  onZoomReset={zoomReset}
+                  workspaceKey={workspaceKey}
                   docKey={docKeyFor(secondaryTab)}
                   resolveImage={secondaryResolveImage}
                   onNavigate={secondaryNavigate}
@@ -1210,7 +1294,7 @@ export function App() {
       {settingsModal}
       {paletteOpen && (
         <CommandPalette
-          files={flattenFiles(tree)}
+          files={visibleFiles}
           onOpen={(p) => {
             openFile(p);
             setPaletteOpen(false);
@@ -1220,7 +1304,7 @@ export function App() {
       )}
       {searchMode && source && (
         <WorkspaceSearch
-          files={flattenFiles(tree)}
+          files={visibleFiles}
           source={source}
           startMode={searchMode}
           onOpen={openFromSearch}

@@ -18,7 +18,7 @@
  * gates the UI so it never appears where it can't work.
  */
 
-import type { TreeNode } from '@lookmd/shared';
+import { ALL_TEXT_EXTENSIONS, extensionOf, type TreeNode } from '@lookmd/shared';
 import { ApiRequestError } from '../api';
 import type { FileSource } from './types';
 
@@ -59,8 +59,12 @@ export async function hasPermission(
 
 // --- shared helpers ---------------------------------------------------------
 
-/** Extensions we read or write — mirrors the server's ALLOWED_EXTENSIONS. */
-const ALLOWED = /\.(md|markdown|mdown|mkd|txt|text)$/i;
+/** Extensions we read or write — the shared plain-text allowlist (same set the
+ *  server enforces). Which of these are *shown* is a display preference. */
+const ALLOWED_EXTS = new Set<string>(ALL_TEXT_EXTENSIONS);
+function isAllowed(name: string): boolean {
+  return ALLOWED_EXTS.has(extensionOf(name));
+}
 /** Directories never descended into, matching the server's SKIP_DIRS. */
 const SKIP_DIRS = new Set(['node_modules']);
 
@@ -101,7 +105,7 @@ function splitPath(p: string): string[] {
 }
 
 function assertAllowed(p: string): void {
-  if (!ALLOWED.test(p)) {
+  if (!isAllowed(p)) {
     throw new ApiRequestError(400, 'DISALLOWED_TYPE', `file type not permitted: ${p}`);
   }
 }
@@ -152,7 +156,7 @@ export function createFsaSource(root: FileSystemDirectoryHandle): FileSource {
           type: 'dir',
           children: await walk(handle, rel),
         });
-      } else if (ALLOWED.test(name)) {
+      } else if (isAllowed(name)) {
         nodes.push({ name, path: rel, type: 'file' });
       }
     }

@@ -7,11 +7,20 @@
  * the override so the active theme's default font shows through.
  */
 
+import {
+  FILE_TYPE_GROUPS,
+  DEFAULT_FILE_TYPE_IDS,
+  extensionOf,
+  type TreeNode,
+} from '@lookmd/shared';
+
 const THEME_KEY = 'lookmd.theme';
 const FONTS_KEY = 'lookmd.fonts';
 const SIDEBAR_KEY = 'lookmd.sidebar';
 const SIDEBAR_WIDTH_KEY = 'lookmd.sidebarWidth';
 const LINE_NUMBERS_KEY = 'lookmd.lineNumbers';
+const ZOOM_KEY = 'lookmd.zoom';
+const FILETYPES_KEY = 'lookmd.fileTypes';
 
 export type ThemeId =
   | 'paper'
@@ -176,6 +185,73 @@ export function getLineNumbers(): boolean {
 
 export function setLineNumbers(on: boolean): void {
   writeRaw(LINE_NUMBERS_KEY, on ? '1' : '0');
+}
+
+/** Content zoom — a unitless multiplier on the Read/Source/Editor font sizes. */
+export const ZOOM_MIN = 0.6;
+export const ZOOM_MAX = 2.4;
+export const ZOOM_STEP = 0.1;
+export const DEFAULT_ZOOM = 1;
+
+export function clampZoom(z: number): number {
+  // Round to one decimal so repeated stepping doesn't accrue float drift.
+  const r = Math.round(z * 10) / 10;
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, r));
+}
+
+export function getZoom(): number {
+  const n = parseFloat(readRaw(ZOOM_KEY) ?? '');
+  return Number.isFinite(n) ? clampZoom(n) : DEFAULT_ZOOM;
+}
+
+export function setZoom(z: number): void {
+  writeRaw(ZOOM_KEY, String(clampZoom(z)));
+}
+
+/**
+ * File-type display preference: the set of group ids whose files appear in the
+ * tree. Markdown is always included. The server still serves every allowed text
+ * type — this only governs what the client *shows*.
+ */
+export function getFileTypes(): string[] {
+  const raw = readRaw(FILETYPES_KEY);
+  if (!raw) return [...DEFAULT_FILE_TYPE_IDS];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const ids = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+    const valid = ids.filter((id) => FILE_TYPE_GROUPS.some((g) => g.id === id));
+    return Array.from(new Set(['markdown', ...valid]));
+  } catch {
+    return [...DEFAULT_FILE_TYPE_IDS];
+  }
+}
+
+export function setFileTypes(ids: string[]): void {
+  const valid = ids.filter((id) => FILE_TYPE_GROUPS.some((g) => g.id === id));
+  writeRaw(FILETYPES_KEY, JSON.stringify(Array.from(new Set(['markdown', ...valid]))));
+}
+
+/** Flatten enabled group ids to the concrete set of visible extensions. */
+export function enabledExtensions(ids: string[]): Set<string> {
+  const set = new Set<string>();
+  for (const g of FILE_TYPE_GROUPS) {
+    if (g.always || ids.includes(g.id)) g.extensions.forEach((e) => set.add(e));
+  }
+  return set;
+}
+
+/** Prune a tree to files whose extension is enabled, dropping now-empty dirs. */
+export function filterTreeByFileTypes(nodes: TreeNode[], exts: Set<string>): TreeNode[] {
+  const out: TreeNode[] = [];
+  for (const n of nodes) {
+    if (n.type === 'dir') {
+      const children = filterTreeByFileTypes(n.children ?? [], exts);
+      if (children.length) out.push({ ...n, children });
+    } else if (exts.has(extensionOf(n.name))) {
+      out.push(n);
+    }
+  }
+  return out;
 }
 
 export function applyTheme(theme: ThemeId): void {
