@@ -20,7 +20,10 @@ Project / CLI / package name: `lookmd`. Domain: `look.md`.
   deliberate exception:** the File System Access directory-handle store uses
   IndexedDB (handles aren't JSON-serializable), so a granted local folder
   survives reload. Nothing else may use IndexedDB.
-- No Docker for MVP. Run via npm scripts on localhost.
+- Local dev runs via npm scripts on localhost. A single-origin Docker image now
+  also exists (multi-stage `Dockerfile` — the Fastify server serves the built
+  client and the API on one port) for Coolify / any Docker host. Docker is no
+  longer out of scope; keep the npm-scripts path as the primary local workflow.
 
 ## Architecture
 
@@ -82,10 +85,14 @@ Not "later." These go into the first file-touching commit.
   to trust or distrust — the browser's own folder-permission grant *is* the
   sandbox, and segment lookups can't escape the chosen directory. It still
   enforces the same extension allowlist client-side.
-- **Deployment split (later, not MVP)**: a public build is VIEW-ONLY (write/create/
-  delete endpoints don't exist in it); the full edit build is gated behind Tailscale.
-  For local-first MVP, build the full edit-capable version, but structure the code
-  so write endpoints can be disabled by config.
+- **Deployment split**: a public build is VIEW-ONLY (write/create/delete endpoints
+  don't exist in it); the full edit build is gated behind Tailscale. The config
+  switch exists now — `LOOKMD_READ_ONLY` (env) / `--read-only` (CLI) leaves the
+  write endpoints unregistered. The full edit-capable version is the default.
+- **Production CSP**: when the server serves the built client (`LOOKMD_STATIC_DIR`),
+  it sends a document-level Content-Security-Policy plus baseline hardening
+  headers; raw image assets get their own stricter sandbox CSP. Dev (Vite) is
+  unaffected.
 
 ## File handling
 
@@ -131,14 +138,18 @@ sets the font properties. Switching either swaps data only — components never 
 
 ## Out of scope for MVP (do NOT build yet)
 
-- Docker / packaging
-- WebSocket / live file-watching (manual refresh is fine)
 - Server-side full-filesystem browser (the *server* picker stays base-scoped).
   Note: opening a local folder client-side via the File System Access source is
   now supported — that's the browser's native picker, not a server endpoint.
 - Per-workspace settings files
 - Auth beyond the future Tailscale gating
-- Live split preview while editing (stretch — only if Day 3 has room)
+
+### Already built (no longer out of scope)
+
+- Docker / packaging — single-origin image for Coolify (see Stack note above).
+- WebSocket / live file-watching — implemented (`server/src/watcher.ts`); the
+  client reloads clean open files and flags dirty ones on external change.
+- Live split preview while editing — a split view exists.
 
 ## How to work with me (Naveen)
 
