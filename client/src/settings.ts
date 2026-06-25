@@ -22,6 +22,17 @@ const LINE_NUMBERS_KEY = 'lookmd.lineNumbers';
 const ZOOM_KEY = 'lookmd.zoom';
 const FILETYPES_KEY = 'lookmd.fileTypes';
 
+/** Every settings key, so the cross-tab listener can tell our writes from noise. */
+const SETTINGS_KEYS: ReadonlySet<string> = new Set([
+  THEME_KEY,
+  FONTS_KEY,
+  SIDEBAR_KEY,
+  SIDEBAR_WIDTH_KEY,
+  LINE_NUMBERS_KEY,
+  ZOOM_KEY,
+  FILETYPES_KEY,
+]);
+
 export type ThemeId =
   | 'paper'
   | 'daylight'
@@ -40,15 +51,46 @@ export type ThemeId =
   | 'obsidian'
   | 'amber'
   | 'espresso'
-  | 'cyberpunk';
+  | 'cyberpunk'
+  // — Added darker darks —
+  | 'carbon'
+  | 'abyss'
+  | 'noir'
+  // — Added lights —
+  | 'github-light'
+  | 'one-light'
+  | 'ayu-light'
+  | 'gruvbox-light'
+  | 'rose-pine-dawn'
+  | 'everforest'
+  | 'tokyo-day'
+  | 'snow'
+  | 'quartz'
+  | 'sepia'
+  | 'mint'
+  | 'sky'
+  | 'sandstone';
 
 export const THEMES: { id: ThemeId; label: string; light?: boolean }[] = [
-  // — Light —
+  // — Light (17) —
   { id: 'paper', label: 'Paper', light: true },
   { id: 'daylight', label: 'Daylight', light: true },
   { id: 'latte', label: 'Latte', light: true },
   { id: 'solarized', label: 'Solarized', light: true },
-  // — Dark —
+  { id: 'github-light', label: 'GitHub Light', light: true },
+  { id: 'one-light', label: 'One Light', light: true },
+  { id: 'ayu-light', label: 'Ayu Light', light: true },
+  { id: 'gruvbox-light', label: 'Gruvbox Light', light: true },
+  { id: 'rose-pine-dawn', label: 'Rosé Pine Dawn', light: true },
+  { id: 'everforest', label: 'Everforest', light: true },
+  { id: 'tokyo-day', label: 'Tokyo Day', light: true },
+  { id: 'snow', label: 'Snow', light: true },
+  { id: 'quartz', label: 'Quartz', light: true },
+  { id: 'sepia', label: 'Sepia', light: true },
+  { id: 'mint', label: 'Mint', light: true },
+  { id: 'sky', label: 'Sky', light: true },
+  { id: 'sandstone', label: 'Sandstone', light: true },
+  // — Dark (17) —
   { id: 'slate', label: 'Slate' },
   { id: 'nord', label: 'Nord' },
   { id: 'mocha', label: 'Mocha' },
@@ -63,6 +105,9 @@ export const THEMES: { id: ThemeId; label: string; light?: boolean }[] = [
   { id: 'amber', label: 'Amber' },
   { id: 'espresso', label: 'Espresso' },
   { id: 'cyberpunk', label: 'Cyberpunk' },
+  { id: 'carbon', label: 'Carbon' },
+  { id: 'abyss', label: 'Abyss' },
+  { id: 'noir', label: 'Noir' },
 ];
 
 const DEFAULT_THEME: ThemeId = 'paper';
@@ -281,4 +326,20 @@ export function setFonts(fonts: Fonts): void {
 export function bootstrapAppearance(): void {
   applyTheme(getTheme());
   applyFonts(getFonts());
+}
+
+/**
+ * Live-sync settings across tabs of the same origin. The browser fires `storage`
+ * only in *other* tabs (never the one that wrote), so this can't echo our own
+ * change. `onChange` runs whenever another tab touches any settings key (or
+ * clears storage, where `e.key` is null); it should re-read via the getters and
+ * update React state. Returns an unsubscribe function.
+ */
+export function subscribeSettings(onChange: () => void): () => void {
+  const handler = (e: StorageEvent) => {
+    if (e.key !== null && !SETTINGS_KEYS.has(e.key)) return;
+    onChange();
+  };
+  window.addEventListener('storage', handler);
+  return () => window.removeEventListener('storage', handler);
 }

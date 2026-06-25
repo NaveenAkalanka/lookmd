@@ -5,8 +5,15 @@
  */
 
 import { useEffect, useState } from 'react';
+import { FILE_TYPE_GROUPS } from '@lookmd/shared';
 import { Icon } from './Icon';
-import { Cancel01Icon } from '@hugeicons/core-free-icons';
+import {
+  Cancel01Icon,
+  Coffee02Icon,
+  Linkedin01Icon,
+  CopyrightIcon,
+  FavouriteIcon,
+} from '@hugeicons/core-free-icons';
 import {
   THEMES,
   READING_FONTS,
@@ -22,10 +29,12 @@ interface Props {
   fonts: Fonts;
   sidebar: SidebarPref;
   lineNumbers: boolean;
+  fileTypes: string[];
   onTheme: (theme: ThemeId) => void;
   onFonts: (fonts: Fonts) => void;
   onSidebar: (sidebar: SidebarPref) => void;
   onLineNumbers: (on: boolean) => void;
+  onFileTypes: (ids: string[]) => void;
   onClose: () => void;
 }
 
@@ -34,10 +43,12 @@ export function SettingsPanel({
   fonts,
   sidebar,
   lineNumbers,
+  fileTypes,
   onTheme,
   onFonts,
   onSidebar,
   onLineNumbers,
+  onFileTypes,
   onClose,
 }: Props) {
   useEffect(() => {
@@ -139,6 +150,69 @@ export function SettingsPanel({
                 Show line numbers (Source &amp; Edit)
               </label>
             </section>
+
+            <section className="settings-section">
+              <span className="settings-heading">File types</span>
+              <p className="setting-hint">
+                Which file types appear in the sidebar. Non-Markdown files open in
+                Source / Edit.
+              </p>
+              {FILE_TYPE_GROUPS.map((g) => {
+                const on = g.always || fileTypes.includes(g.id);
+                return (
+                  <label className="setting-check" key={g.id}>
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      disabled={g.always}
+                      onChange={(e) =>
+                        onFileTypes(
+                          e.target.checked
+                            ? [...fileTypes, g.id]
+                            : fileTypes.filter((id) => id !== g.id),
+                        )
+                      }
+                    />
+                    {g.label}
+                    <span className="setting-ext">
+                      {g.extensions.slice(0, 4).join(' ')}
+                      {g.extensions.length > 4 ? ' …' : ''}
+                    </span>
+                  </label>
+                );
+              })}
+            </section>
+          </div>
+        </div>
+
+        {/* ── Footer: author credit, license, and support links ── */}
+        <div className="settings-window-foot">
+          <div className="settings-credit">
+            <span className="settings-credit-by">
+              Designed &amp; Developed by <strong>Naveen Akalanka</strong>
+              <Icon icon={FavouriteIcon} size={13} className="settings-credit-heart" />
+            </span>
+            <span className="settings-credit-license">
+              <Icon icon={CopyrightIcon} size={13} /> Licensed under the MIT License
+            </span>
+          </div>
+          <div className="settings-credit-links">
+            <a
+              className="btn settings-link-btn settings-link-coffee"
+              href="https://buymeacoffee.com/naveenakalanka"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Icon icon={Coffee02Icon} size={16} /> Buy me a coffee
+            </a>
+            <a
+              className="btn settings-link-btn"
+              href="https://www.linkedin.com/in/naveen-akalanka"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Icon icon={Linkedin01Icon} size={16} /> LinkedIn
+            </a>
           </div>
         </div>
       </div>

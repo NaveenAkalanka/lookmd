@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Self-hosted, workspace-scoped Markdown viewer and editor.",
+  "author": "Naveen Akalanka",
   "license": "MIT",
   "workspaces": [
     "shared",

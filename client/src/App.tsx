@@ -73,6 +73,9 @@ import {
   setFileTypes as persistFileTypes,
   enabledExtensions,
   filterTreeByFileTypes,
+  applyTheme,
+  applyFonts,
+  subscribeSettings,
   SIDEBAR_WIDTH_MIN,
   SIDEBAR_WIDTH_MAX,
   type ThemeId,
@@ -313,6 +316,25 @@ export function App() {
     setFileTypesState(ids);
     persistFileTypes(ids);
   }, []);
+
+  // Live-sync appearance across tabs of the same origin: when another tab changes
+  // a setting, re-read it here so theme/fonts/zoom/etc. stay consistent without a
+  // reload. Re-reading every key on any change keeps this simple and cheap; the
+  // value is already in storage, so we only mirror it into state (and the DOM for
+  // theme/fonts), never re-persist.
+  useEffect(() => subscribeSettings(() => {
+    const t = getTheme();
+    setTheme(t);
+    applyTheme(t);
+    const f = getFonts();
+    setFonts(f);
+    applyFonts(f);
+    setSidebarState(getSidebar());
+    setLineNumbersState(getLineNumbers());
+    setZoomState(getZoom());
+    setFileTypesState(getFileTypes());
+    setSidebarWidth(getSidebarWidth());
+  }), []);
 
   // The tree as displayed: pruned to the file types the user has enabled. The
   // server still serves every allowed text type; this is purely what we show.

@@ -74,6 +74,19 @@
   /* Content zoom multiplier; overridden inline on .app, scales Read/Source/Edit. */
   --zoom: 1;
 
+  /* Shared motion curves. `out` is a soft decelerate (easeOutQuint-ish) for
+   * entrances and UI feedback; `spring` adds a tiny overshoot for pop-ins. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  /* How long a theme/token swap cross-fades. */
+  --theme-fade: 0.4s;
+
+  /* Brand colors for external-service buttons. Fixed across themes by design
+   * (a brand mark looks the same everywhere), tokenized here so components stay
+   * free of hardcoded values — same approach as the --annot-* palette. */
+  --brand-coffee: #ffdd00;
+  --brand-coffee-ink: #2b2510;
+
   color-scheme: light;
 }
 
@@ -585,6 +598,458 @@
   color-scheme: dark;
 }
 
+/* ===== Additional darker dark themes ==================================== */
+
+/* Carbon — true-black OLED. */
+[data-theme='carbon'] {
+  --background: #000000;
+  --surface: #0b0b0c;
+  --text-primary: #e6e6e6;
+  --text-secondary: #9a9a9a;
+  --text-tertiary: #5e5e5e;
+  --accent: #4f9eff;
+  --accent-2: var(--accent);
+  --border: #1c1c1e;
+  --danger: #ff5c5c;
+  --syntax-keyword: #c792ea;
+  --syntax-string: #9ece6a;
+  --syntax-comment: #5e5e5e;
+  --syntax-number: #ff9e64;
+  --syntax-function: #7aa2f7;
+  --syntax-type: #e0af68;
+  --syntax-constant: #ff9e64;
+  --syntax-variable: #e6e6e6;
+  --syntax-operator: #89ddff;
+  --syntax-punctuation: #8a8a8a;
+  --syntax-property: #7aa2f7;
+  --syntax-tag: #f7768e;
+  --syntax-heading: #4f9eff;
+  --syntax-link: #4f9eff;
+  color-scheme: dark;
+}
+
+/* Abyss — deep blue-black, oceanic. */
+[data-theme='abyss'] {
+  --background: #03060d;
+  --surface: #0a121f;
+  --text-primary: #cfe0f2;
+  --text-secondary: #7e93ad;
+  --text-tertiary: #4a5a72;
+  --accent: #3aa0ff;
+  --accent-2: #34d3c0;
+  --border: #14202f;
+  --danger: #ff6b81;
+  --syntax-keyword: #6aa9ff;
+  --syntax-string: #4ec9b0;
+  --syntax-comment: #4a5a72;
+  --syntax-number: #d8a657;
+  --syntax-function: #46b3ff;
+  --syntax-type: #34d3c0;
+  --syntax-constant: #d8a657;
+  --syntax-variable: #cfe0f2;
+  --syntax-operator: #56c8ff;
+  --syntax-punctuation: #7e93ad;
+  --syntax-property: #34d3c0;
+  --syntax-tag: #ff6b81;
+  --syntax-heading: #3aa0ff;
+  --syntax-link: #3aa0ff;
+  color-scheme: dark;
+}
+
+/* Noir — monochrome on near-black; hue removed, contrast does the work. */
+[data-theme='noir'] {
+  --background: #050505;
+  --surface: #121212;
+  --text-primary: #eaeaea;
+  --text-secondary: #9e9e9e;
+  --text-tertiary: #5a5a5a;
+  --accent: #cfcfcf;
+  --accent-2: #8f8f8f;
+  --border: #1f1f1f;
+  --danger: #e57373;
+  --syntax-keyword: #d6d6d6;
+  --syntax-string: #b8b8b8;
+  --syntax-comment: #5a5a5a;
+  --syntax-number: #cccccc;
+  --syntax-function: #e0e0e0;
+  --syntax-type: #c2c2c2;
+  --syntax-constant: #cccccc;
+  --syntax-variable: #eaeaea;
+  --syntax-operator: #bdbdbd;
+  --syntax-punctuation: #9e9e9e;
+  --syntax-property: #d0d0d0;
+  --syntax-tag: #e57373;
+  --syntax-heading: #cfcfcf;
+  --syntax-link: #cfcfcf;
+  color-scheme: dark;
+}
+
+/* ===== Additional light themes ========================================= */
+
+/* GitHub Light — clean white, the familiar GitHub palette. */
+[data-theme='github-light'] {
+  --background: #ffffff;
+  --surface: #f6f8fa;
+  --text-primary: #1f2328;
+  --text-secondary: #57606a;
+  --text-tertiary: #8c959f;
+  --accent: #0969da;
+  --accent-2: var(--accent);
+  --border: #d1d9e0;
+  --danger: #cf222e;
+  --syntax-keyword: #cf222e;
+  --syntax-string: #0a3069;
+  --syntax-comment: #6e7781;
+  --syntax-number: #0550ae;
+  --syntax-function: #8250df;
+  --syntax-type: #953800;
+  --syntax-constant: #0550ae;
+  --syntax-variable: #1f2328;
+  --syntax-operator: #0550ae;
+  --syntax-punctuation: #8c959f;
+  --syntax-property: #0550ae;
+  --syntax-tag: #116329;
+  --syntax-heading: #0969da;
+  --syntax-link: #0969da;
+  color-scheme: light;
+}
+
+/* One Light — Atom's light palette. */
+[data-theme='one-light'] {
+  --background: #fafafa;
+  --surface: #ffffff;
+  --text-primary: #383a42;
+  --text-secondary: #696c77;
+  --text-tertiary: #a0a1a7;
+  --accent: #4078f2;
+  --accent-2: var(--accent);
+  --border: #e5e5e6;
+  --danger: #e45649;
+  --syntax-keyword: #a626a4;
+  --syntax-string: #50a14f;
+  --syntax-comment: #a0a1a7;
+  --syntax-number: #986801;
+  --syntax-function: #4078f2;
+  --syntax-type: #c18401;
+  --syntax-constant: #986801;
+  --syntax-variable: #383a42;
+  --syntax-operator: #0184bc;
+  --syntax-punctuation: #a0a1a7;
+  --syntax-property: #e45649;
+  --syntax-tag: #e45649;
+  --syntax-heading: #4078f2;
+  --syntax-link: #4078f2;
+  color-scheme: light;
+}
+
+/* Ayu Light — warm off-white with orange accents. */
+[data-theme='ayu-light'] {
+  --background: #fafafa;
+  --surface: #ffffff;
+  --text-primary: #5c6166;
+  --text-secondary: #828c99;
+  --text-tertiary: #abb0b6;
+  --accent: #ff9940;
+  --accent-2: #fa8d3e;
+  --border: #e7e8e9;
+  --danger: #f07171;
+  --syntax-keyword: #fa8d3e;
+  --syntax-string: #86b300;
+  --syntax-comment: #abb0b6;
+  --syntax-number: #a37acc;
+  --syntax-function: #f2ae49;
+  --syntax-type: #55b4d4;
+  --syntax-constant: #a37acc;
+  --syntax-variable: #5c6166;
+  --syntax-operator: #ed9366;
+  --syntax-punctuation: #abb0b6;
+  --syntax-property: #55b4d4;
+  --syntax-tag: #55b4d4;
+  --syntax-heading: #ff9940;
+  --syntax-link: #399ee6;
+  color-scheme: light;
+}
+
+/* Gruvbox Light — warm retro beige. */
+[data-theme='gruvbox-light'] {
+  --background: #fbf1c7;
+  --surface: #f2e5bc;
+  --text-primary: #3c3836;
+  --text-secondary: #665c54;
+  --text-tertiary: #928374;
+  --accent: #af3a03;
+  --accent-2: #d65d0e;
+  --border: #ebdbb2;
+  --danger: #9d0006;
+  --syntax-keyword: #9d0006;
+  --syntax-string: #79740e;
+  --syntax-comment: #928374;
+  --syntax-number: #8f3f71;
+  --syntax-function: #427b58;
+  --syntax-type: #b57614;
+  --syntax-constant: #8f3f71;
+  --syntax-variable: #3c3836;
+  --syntax-operator: #af3a03;
+  --syntax-punctuation: #928374;
+  --syntax-property: #076678;
+  --syntax-tag: #9d0006;
+  --syntax-heading: #af3a03;
+  --syntax-link: #076678;
+  color-scheme: light;
+}
+
+/* Rosé Pine Dawn — soft, muted rose light. */
+[data-theme='rose-pine-dawn'] {
+  --background: #faf4ed;
+  --surface: #fffaf3;
+  --text-primary: #575279;
+  --text-secondary: #797593;
+  --text-tertiary: #9893a5;
+  --accent: #d7827e;
+  --accent-2: #907aa9;
+  --border: #f2e9e1;
+  --danger: #b4637a;
+  --syntax-keyword: #286983;
+  --syntax-string: #56949f;
+  --syntax-comment: #9893a5;
+  --syntax-number: #ea9d34;
+  --syntax-function: #d7827e;
+  --syntax-type: #56949f;
+  --syntax-constant: #ea9d34;
+  --syntax-variable: #575279;
+  --syntax-operator: #286983;
+  --syntax-punctuation: #9893a5;
+  --syntax-property: #907aa9;
+  --syntax-tag: #b4637a;
+  --syntax-heading: #d7827e;
+  --syntax-link: #56949f;
+  color-scheme: light;
+}
+
+/* Everforest — gentle warm-green light. */
+[data-theme='everforest'] {
+  --background: #fdf6e3;
+  --surface: #f4f0d9;
+  --text-primary: #5c6a72;
+  --text-secondary: #829181;
+  --text-tertiary: #a6b0a0;
+  --accent: #8da101;
+  --accent-2: #35a77c;
+  --border: #eceadb;
+  --danger: #f85552;
+  --syntax-keyword: #f85552;
+  --syntax-string: #8da101;
+  --syntax-comment: #a6b0a0;
+  --syntax-number: #df69ba;
+  --syntax-function: #3a94c5;
+  --syntax-type: #dfa000;
+  --syntax-constant: #df69ba;
+  --syntax-variable: #5c6a72;
+  --syntax-operator: #f57d26;
+  --syntax-punctuation: #a6b0a0;
+  --syntax-property: #35a77c;
+  --syntax-tag: #f85552;
+  --syntax-heading: #8da101;
+  --syntax-link: #3a94c5;
+  color-scheme: light;
+}
+
+/* Tokyo Day — the light face of Tokyo Night. */
+[data-theme='tokyo-day'] {
+  --background: #e1e2e7;
+  --surface: #e9e9ed;
+  --text-primary: #2c3043;
+  --text-secondary: #6172b0;
+  --text-tertiary: #848cb5;
+  --accent: #2e7de9;
+  --accent-2: #9854f1;
+  --border: #cfd2e0;
+  --danger: #f52a65;
+  --syntax-keyword: #9854f1;
+  --syntax-string: #587539;
+  --syntax-comment: #848cb5;
+  --syntax-number: #b15c00;
+  --syntax-function: #2e7de9;
+  --syntax-type: #007197;
+  --syntax-constant: #b15c00;
+  --syntax-variable: #2c3043;
+  --syntax-operator: #006a83;
+  --syntax-punctuation: #848cb5;
+  --syntax-property: #2e7de9;
+  --syntax-tag: #f52a65;
+  --syntax-heading: #2e7de9;
+  --syntax-link: #2e7de9;
+  color-scheme: light;
+}
+
+/* Snow — Nord's light "Snow Storm". */
+[data-theme='snow'] {
+  --background: #eceff4;
+  --surface: #e5e9f0;
+  --text-primary: #2e3440;
+  --text-secondary: #4c566a;
+  --text-tertiary: #7b8394;
+  --accent: #5e81ac;
+  --accent-2: #81a1c1;
+  --border: #d8dee9;
+  --danger: #bf616a;
+  --syntax-keyword: #5e81ac;
+  --syntax-string: #4f6b3f;
+  --syntax-comment: #7b8394;
+  --syntax-number: #9d6ca0;
+  --syntax-function: #5e81ac;
+  --syntax-type: #2a7d77;
+  --syntax-constant: #b86f3c;
+  --syntax-variable: #2e3440;
+  --syntax-operator: #5e81ac;
+  --syntax-punctuation: #7b8394;
+  --syntax-property: #2a7d77;
+  --syntax-tag: #bf616a;
+  --syntax-heading: #5e81ac;
+  --syntax-link: #5e81ac;
+  color-scheme: light;
+}
+
+/* Quartz — cool neutral light with an indigo accent. */
+[data-theme='quartz'] {
+  --background: #f4f5f7;
+  --surface: #ffffff;
+  --text-primary: #2b2f36;
+  --text-secondary: #5b626c;
+  --text-tertiary: #9aa1ab;
+  --accent: #5b6ee1;
+  --accent-2: #2bb2a6;
+  --border: #e2e5ea;
+  --danger: #d6455d;
+  --syntax-keyword: #7a3ee0;
+  --syntax-string: #2f9e6f;
+  --syntax-comment: #9aa1ab;
+  --syntax-number: #c2682a;
+  --syntax-function: #5b6ee1;
+  --syntax-type: #2bb2a6;
+  --syntax-constant: #c2682a;
+  --syntax-variable: #2b2f36;
+  --syntax-operator: #5b6ee1;
+  --syntax-punctuation: #9aa1ab;
+  --syntax-property: #2bb2a6;
+  --syntax-tag: #d6455d;
+  --syntax-heading: #5b6ee1;
+  --syntax-link: #5b6ee1;
+  color-scheme: light;
+}
+
+/* Sepia — warm parchment, easy on the eyes for long reading. */
+[data-theme='sepia'] {
+  --background: #f4ecd8;
+  --surface: #fbf6e9;
+  --text-primary: #433422;
+  --text-secondary: #6b5a44;
+  --text-tertiary: #9a8a73;
+  --accent: #8a5a2b;
+  --accent-2: #a3791f;
+  --border: #e6dcc4;
+  --danger: #a23b2e;
+  --syntax-keyword: #8c3b3b;
+  --syntax-string: #5f6f2a;
+  --syntax-comment: #9a8a73;
+  --syntax-number: #9a5a2b;
+  --syntax-function: #3f6f7a;
+  --syntax-type: #a3791f;
+  --syntax-constant: #9a5a2b;
+  --syntax-variable: #433422;
+  --syntax-operator: #8a5a2b;
+  --syntax-punctuation: #9a8a73;
+  --syntax-property: #3f6f7a;
+  --syntax-tag: #8c3b3b;
+  --syntax-heading: #8a5a2b;
+  --syntax-link: #3f6f7a;
+  color-scheme: light;
+}
+
+/* Mint — fresh green-tinted white. */
+[data-theme='mint'] {
+  --background: #f2faf6;
+  --surface: #ffffff;
+  --text-primary: #1f3b30;
+  --text-secondary: #4a6b5d;
+  --text-tertiary: #87a297;
+  --accent: #0f9d6b;
+  --accent-2: #0bb39a;
+  --border: #d9ece3;
+  --danger: #d6455d;
+  --syntax-keyword: #0e8a86;
+  --syntax-string: #2f8f4e;
+  --syntax-comment: #87a297;
+  --syntax-number: #b06a2c;
+  --syntax-function: #0f9d6b;
+  --syntax-type: #2b8fb0;
+  --syntax-constant: #b06a2c;
+  --syntax-variable: #1f3b30;
+  --syntax-operator: #0f9d6b;
+  --syntax-punctuation: #87a297;
+  --syntax-property: #2b8fb0;
+  --syntax-tag: #d6455d;
+  --syntax-heading: #0f9d6b;
+  --syntax-link: #2b8fb0;
+  color-scheme: light;
+}
+
+/* Sky — airy blue-tinted white. */
+[data-theme='sky'] {
+  --background: #eef5fc;
+  --surface: #ffffff;
+  --text-primary: #16314d;
+  --text-secondary: #436585;
+  --text-tertiary: #8aa6c0;
+  --accent: #1184e8;
+  --accent-2: #00a3c4;
+  --border: #d6e6f4;
+  --danger: #e0496b;
+  --syntax-keyword: #6b5bd6;
+  --syntax-string: #1f8a70;
+  --syntax-comment: #8aa6c0;
+  --syntax-number: #c4631f;
+  --syntax-function: #1184e8;
+  --syntax-type: #00a3c4;
+  --syntax-constant: #c4631f;
+  --syntax-variable: #16314d;
+  --syntax-operator: #1184e8;
+  --syntax-punctuation: #8aa6c0;
+  --syntax-property: #00a3c4;
+  --syntax-tag: #e0496b;
+  --syntax-heading: #1184e8;
+  --syntax-link: #1184e8;
+  color-scheme: light;
+}
+
+/* Sandstone — warm tan with terracotta and gold. */
+[data-theme='sandstone'] {
+  --background: #f5efe6;
+  --surface: #fdf9f1;
+  --text-primary: #3a332a;
+  --text-secondary: #6a5f4f;
+  --text-tertiary: #9c8f78;
+  --accent: #b06a3a;
+  --accent-2: #c89b3c;
+  --border: #e7ddcb;
+  --danger: #b23a32;
+  --syntax-keyword: #a23f54;
+  --syntax-string: #6b7a2e;
+  --syntax-comment: #9c8f78;
+  --syntax-number: #b0703a;
+  --syntax-function: #3f6f7a;
+  --syntax-type: #c89b3c;
+  --syntax-constant: #b0703a;
+  --syntax-variable: #3a332a;
+  --syntax-operator: #b06a3a;
+  --syntax-punctuation: #9c8f78;
+  --syntax-property: #3f6f7a;
+  --syntax-tag: #a23f54;
+  --syntax-heading: #b06a3a;
+  --syntax-link: #3f6f7a;
+  color-scheme: light;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -629,29 +1094,50 @@ body {
 }
 
 /* App shell — hides the flash of unstyled/loading content on first paint */
-.app { animation: fade-in 0.18s ease-out both; }
+.app { animation: fade-in 0.22s var(--ease-out) both; }
 
-/* Overlays */
-.settings-backdrop  { animation: fade-in  0.14s ease-out both; }
-.settings-window    { animation: scale-in 0.16s ease-out both; }
-.palette-backdrop   { animation: fade-in  0.12s ease-out both; }
-.palette            { animation: scale-in 0.14s ease-out both; }
-.context-menu       { animation: scale-in 0.10s ease-out both; transform-origin: top left; }
-.search-window      { animation: scale-in 0.15s ease-out both; }
-.sidebar-backdrop   { animation: fade-in  0.12s ease-out both; }
+/* Overlays — soft decelerate, with a hint of spring on the pop-in windows */
+.settings-backdrop  { animation: fade-in  0.18s var(--ease-out) both; }
+.settings-window    { animation: scale-in 0.26s var(--ease-spring) both; }
+.palette-backdrop   { animation: fade-in  0.16s var(--ease-out) both; }
+.palette            { animation: scale-in 0.22s var(--ease-spring) both; }
+.context-menu       { animation: scale-in 0.14s var(--ease-out) both; transform-origin: top left; }
+.search-window      { animation: scale-in 0.22s var(--ease-spring) both; }
+.sidebar-backdrop   { animation: fade-in  0.16s var(--ease-out) both; }
 
 /* Dropdowns / popovers */
-.menu-pop    { animation: slide-down 0.10s ease-out both; }
-.create-pop  { animation: scale-in  0.10s ease-out both; transform-origin: top left; }
+.menu-pop    { animation: slide-down 0.16s var(--ease-out) both; }
+.create-pop  { animation: scale-in  0.14s var(--ease-out) both; transform-origin: top left; }
 
 /* File content — fades in when a file loads or the mode switches */
-.read         { animation: fade-in 0.14s ease-out both; }
+.read         { animation: fade-in 0.2s var(--ease-out) both; }
 .source-wrap,
-.source:not(.source-nowrap) { animation: fade-in 0.14s ease-out both; }
-.editor       { animation: fade-in 0.12s ease-out both; }
+.source:not(.source-nowrap) { animation: fade-in 0.2s var(--ease-out) both; }
+.editor       { animation: fade-in 0.18s var(--ease-out) both; }
 
 /* Tree items slide up gently when the tree (re)loads */
-.tree > li    { animation: slide-up 0.12s ease-out both; }
+.tree > li    { animation: slide-up 0.18s var(--ease-out) both; }
+
+/* Theme switch — major surfaces cross-fade their token colors instead of
+ * snapping. Scoped to containers (not interactive controls, which run their own
+ * hover transitions) so a recolour glides without making clicks feel laggy. */
+body,
+.app,
+.topbar,
+.sidebar,
+.pane,
+.tabs,
+.read,
+.source-wrap,
+.source,
+.cm-editor,
+.settings-window,
+.settings-pane-themes,
+.settings-pane-options {
+  transition: background-color var(--theme-fade) var(--ease-out),
+              color var(--theme-fade) var(--ease-out),
+              border-color var(--theme-fade) var(--ease-out);
+}
 
 /* Loading shimmer for the tree skeleton text */
 .sidebar-loading {
@@ -668,21 +1154,24 @@ body {
   margin: 6px 12px;
 }
 
-/* Global UI transitions — buttons, inputs, tree rows, tabs */
+/* Global UI transitions — buttons, inputs, tree rows, tabs. Slightly longer and
+ * on the shared decelerate curve so hovers and presses feel fluid, not twitchy. */
 button, .btn, input[type='text'], input[type='search'], select {
-  transition: background 0.10s ease, border-color 0.10s ease,
-              color 0.10s ease, box-shadow 0.10s ease, opacity 0.10s ease;
+  transition: background 0.16s var(--ease-out), border-color 0.16s var(--ease-out),
+              color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out),
+              opacity 0.16s var(--ease-out), transform 0.16s var(--ease-out);
 }
-.tree-row-wrap  { transition: background 0.08s ease; }
-.tab            { transition: background 0.10s ease, border-color 0.10s ease,
-                              color 0.10s ease; }
-.theme-card     { transition: border-color 0.12s ease, box-shadow 0.12s ease,
-                              color 0.12s ease; }
-.tree-chevron   { transition: transform 0.12s ease; }
-.tree-action    { transition: color 0.08s ease, opacity 0.08s ease; }
-.topbar-btn, .icon-btn { transition: background 0.10s ease, color 0.10s ease; }
-.sidebar        { transition: box-shadow 0.15s ease; }
-.pane           { transition: box-shadow 0.12s ease; }
+.tree-row-wrap  { transition: background 0.14s var(--ease-out); }
+.tab            { transition: background 0.16s var(--ease-out), border-color 0.16s var(--ease-out),
+                              color 0.16s var(--ease-out); }
+.theme-card     { transition: border-color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out),
+                              color 0.16s var(--ease-out), transform 0.16s var(--ease-out); }
+.tree-chevron   { transition: transform 0.18s var(--ease-out); }
+.tree-action    { transition: color 0.14s var(--ease-out), opacity 0.14s var(--ease-out); }
+.topbar-btn, .icon-btn { transition: background 0.16s var(--ease-out), color 0.16s var(--ease-out),
+                              transform 0.16s var(--ease-out); }
+.sidebar        { transition: box-shadow 0.2s var(--ease-out); }
+.pane           { transition: box-shadow 0.16s var(--ease-out); }
 
 /* Respect the user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
@@ -1681,7 +2170,7 @@ body.resizing-col .sidebar {
   background: color-mix(in srgb, #000 52%, transparent);
 }
 .settings-window {
-  width: 780px;
+  width: 1040px;
   max-width: calc(100vw - 32px);
   max-height: 88vh;
   display: flex;
@@ -1709,7 +2198,7 @@ body.resizing-col .sidebar {
 }
 /* Left panel: scrollable theme gallery */
 .settings-pane-themes {
-  width: 460px;
+  width: 600px;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
   overflow: auto;
@@ -1720,6 +2209,68 @@ body.resizing-col .sidebar {
   flex: 1;
   overflow: auto;
   padding: 20px;
+}
+
+/* Footer: author credit, license, support links */
+.settings-window-foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 13px 20px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+}
+.settings-credit {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+}
+.settings-credit-by {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+.settings-credit-by strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.settings-credit-heart {
+  color: var(--danger);
+}
+.settings-credit-license {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-tertiary);
+  font-size: 11.5px;
+}
+.settings-credit-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 8px;
+  text-decoration: none;
+}
+.settings-link-coffee {
+  background: var(--brand-coffee);
+  color: var(--brand-coffee-ink);
+  border-color: color-mix(in srgb, var(--brand-coffee) 80%, #000);
+}
+.settings-link-coffee:hover {
+  background: color-mix(in srgb, var(--brand-coffee) 88%, #fff);
 }
 
 /* --- Find / Replace in Files -------------------------------------------- */
@@ -1825,7 +2376,7 @@ body.resizing-col .sidebar {
 }
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
 }
 /* Card-style theme picker: mini app-window preview + label */
