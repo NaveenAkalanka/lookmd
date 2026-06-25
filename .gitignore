@@ -19,3 +19,7 @@ Thumbs.db
 # Env
 .env
 .env.local
+
+# Local-only docs / scratch (kept on disk, never tracked)
+DOCUMENTATION.md
+SYNTAX-DEMO.md
