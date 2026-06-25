@@ -135,11 +135,29 @@ export async function getTree(base: string, root: string): Promise<GetTreeRespon
     throw new HttpError(400, 'INVALID_PATH', `workspace is not a folder: ${root}`);
   }
 
-  const tree = walkTree(rootAbs, rootAbs);
+  const tree = walkTree(rootAbs, rootAbs, new Set([fs.realpathSync.native(rootAbs)]), 0);
   return { root: toPosix(path.relative(base, rootAbs)), tree };
 }
 
-function walkTree(rootAbs: string, dirAbs: string): TreeNode[] {
+/** Hard ceiling on directory nesting. Guards against pathologically deep trees
+ *  (and any symlink loop the realpath check below somehow misses) blowing the
+ *  call stack. Far deeper than any real notes folder. */
+const MAX_TREE_DEPTH = 64;
+
+/**
+ * Recursively list a directory. `visited` holds the canonical (realpath) of
+ * every directory already entered on this walk; before descending into a dir we
+ * add its realpath and bail if it was seen before. That stops a symlink that
+ * points back into its own ancestry (e.g. `ws/loop -> ws`) from recursing
+ * forever and crashing the server.
+ */
+function walkTree(
+  rootAbs: string,
+  dirAbs: string,
+  visited: Set<string>,
+  depth: number,
+): TreeNode[] {
+  if (depth >= MAX_TREE_DEPTH) return [];
   const entries = fs.readdirSync(dirAbs, { withFileTypes: true });
   const nodes: TreeNode[] = [];
   for (const entry of entries) {
@@ -168,11 +186,21 @@ function walkTree(rootAbs: string, dirAbs: string): TreeNode[] {
 
     const relPosix = toPosix(path.relative(rootAbs, childAbs));
     if (isDir) {
+      // Skip a directory we've already descended into on this path — a symlink
+      // cycle. Keyed on the canonical path so a link and its target collapse.
+      let realDir: string;
+      try {
+        realDir = fs.realpathSync.native(childAbs);
+      } catch {
+        continue;
+      }
+      if (visited.has(realDir)) continue;
+      visited.add(realDir);
       nodes.push({
         name: entry.name,
         path: relPosix,
         type: 'dir',
-        children: walkTree(rootAbs, childAbs),
+        children: walkTree(rootAbs, childAbs, visited, depth + 1),
       });
     } else if (isAllowedFile(entry.name)) {
       nodes.push({ name: entry.name, path: relPosix, type: 'file' });

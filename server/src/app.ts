@@ -37,8 +37,23 @@ function requireString(value: unknown, field: string): string {
   return value;
 }
 
+/** Generous cap on a single request body. Comfortably fits large Markdown (and
+ *  the code/text files in the allowlist) while bounding per-request memory so a
+ *  giant POST/PUT can't exhaust the server. The Fastify default is only 1 MB,
+ *  which silently 413s legitimate large saves. */
+const BODY_LIMIT_BYTES = 25 * 1024 * 1024;
+
 export function buildApp(config: Config): FastifyInstance {
-  const app = Fastify({ logger: false });
+  const app = Fastify({ logger: false, bodyLimit: BODY_LIMIT_BYTES });
+
+  // Baseline hardening headers on every response (incl. errors and static
+  // assets). Cheap, never breaks a same-origin SPA, and closes MIME-sniffing
+  // and clickjacking vectors. Set early so all later handlers inherit them.
+  app.addHook('onRequest', async (_req, reply) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'no-referrer');
+  });
 
   app.get('/api/health', async () => ({ ok: true, allowWrite: config.allowWrite }));
 
@@ -63,6 +78,12 @@ export function buildApp(config: Config): FastifyInstance {
     const { buffer, contentType } = await readAsset(config.base, root, path);
     reply.header('content-type', contentType);
     reply.header('cache-control', 'no-cache');
+    // Defuse SVG (and any future text-ish image type): embedded as <img> these
+    // bytes are inert, but navigating directly to this URL would render an SVG
+    // as a *document* in our origin and run any <script> inside it. A sandbox
+    // CSP with no allowed sources blocks script/plugins/navigation on that
+    // document while leaving normal <img> embedding untouched.
+    reply.header('content-security-policy', "default-src 'none'; sandbox");
     return reply.send(buffer);
   });
 

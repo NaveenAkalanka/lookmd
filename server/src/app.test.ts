@@ -68,6 +68,13 @@ describe('GET /api/health', () => {
     assert.equal(res.statusCode, 200);
     assert.deepEqual(res.json(), { ok: true, allowWrite: true });
   });
+
+  it('sets baseline hardening headers on every response', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/health' });
+    assert.equal(res.headers['x-content-type-options'], 'nosniff');
+    assert.equal(res.headers['x-frame-options'], 'DENY');
+    assert.equal(res.headers['referrer-policy'], 'no-referrer');
+  });
 });
 
 describe('GET /api/folders', () => {
@@ -177,6 +184,12 @@ describe('GET /api/raw', () => {
     assert.deepEqual(res.rawPayload, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
   });
 
+  it('locks down assets with a sandbox CSP (defuses SVG script on direct nav)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/raw?root=ws&path=image.png' });
+    assert.equal(res.headers['content-security-policy'], "default-src 'none'; sandbox");
+    assert.equal(res.headers['x-content-type-options'], 'nosniff');
+  });
+
   it('400s on a non-image type', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/raw?root=ws&path=note.md' });
     assert.equal(res.statusCode, 400);
@@ -187,6 +200,39 @@ describe('GET /api/raw', () => {
     const res = await app.inject({ method: 'GET', url: '/api/raw?root=ws&path=../other.md' });
     assert.equal(res.statusCode, 403);
     assert.equal((res.json() as ApiError).code, 'OUTSIDE_ROOT');
+  });
+});
+
+describe('GET /api/tree — symlink loop safety', () => {
+  it('does not hang or crash on a directory symlink cycle', async () => {
+    // Build an isolated base with `loopws/self -> loopws` (a cycle inside root).
+    const loopBase = fs.realpathSync.native(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'lookmd-loop-')),
+    );
+    const loopWs = path.join(loopBase, 'loopws');
+    fs.mkdirSync(loopWs, { recursive: true });
+    fs.writeFileSync(path.join(loopWs, 'a.md'), '# a\n');
+
+    let linked = true;
+    try {
+      fs.symlinkSync(loopWs, path.join(loopWs, 'self'), 'dir');
+    } catch {
+      linked = false; // Windows without symlink privilege — nothing to test.
+    }
+
+    if (linked) {
+      const loopApp = buildApp({ base: loopBase, host: '127.0.0.1', port: 0, allowWrite: false });
+      await loopApp.ready();
+      try {
+        const res = await loopApp.inject({ method: 'GET', url: '/api/tree?root=loopws' });
+        assert.equal(res.statusCode, 200); // returned at all => no infinite recursion
+        const paths = flatten((res.json() as GetTreeResponse).tree);
+        assert.ok(paths.includes('a.md'), 'real file still listed');
+      } finally {
+        await loopApp.close();
+      }
+    }
+    fs.rmSync(loopBase, { recursive: true, force: true });
   });
 });
 
