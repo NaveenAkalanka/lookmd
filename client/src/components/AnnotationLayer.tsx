@@ -200,10 +200,11 @@ export function AnnotationLayer({
     svgRef.current?.releasePointerCapture(e.pointerId);
     if (tool === 'eraser') return;
 
-    setDraft((d) => {
-      if (d && isMeaningful(d)) onCommit(d);
-      return null;
-    });
+    // Commit outside the updater (see commitText) so StrictMode's double-invoke
+    // can't double-commit the stroke/box/arrow.
+    const d = draft;
+    setDraft(null);
+    if (d && isMeaningful(d)) onCommit(d);
   }
 
   function onClick(e: React.MouseEvent) {
@@ -238,24 +239,28 @@ export function AnnotationLayer({
   }
 
   function commitText() {
-    setTextDraft((t) => {
-      if (t && t.value.trim()) {
-        if (t.id) {
-          onUpdate(t.id, { text: t.value.trim() });
-        } else {
-          onCommit({
-            id: newMarkId(),
-            tool: 'text',
-            color,
-            x: t.x,
-            y: t.y,
-            text: t.value.trim(),
-            size: textSizeFromWidth(width),
-          });
-        }
-      }
-      return null;
-    });
+    // Read state and fire the commit *outside* the updater: a setState updater
+    // must be pure, and StrictMode invokes it twice in dev — committing inside it
+    // would create two marks. Clearing the draft first also makes a stray second
+    // call (Enter then blur) a no-op.
+    const t = textDraft;
+    if (!t) return;
+    setTextDraft(null);
+    const text = t.value.trim();
+    if (!text) return;
+    if (t.id) {
+      onUpdate(t.id, { text });
+    } else {
+      onCommit({
+        id: newMarkId(),
+        tool: 'text',
+        color,
+        x: t.x,
+        y: t.y,
+        text,
+        size: textSizeFromWidth(width),
+      });
+    }
   }
 
   const selected = selectedId ? marks.find((m) => m.id === selectedId) ?? null : null;

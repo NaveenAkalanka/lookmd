@@ -120,6 +120,27 @@ export function isPinned(key: string): boolean {
   }
 }
 
+/**
+ * Live-sync one file's annotations across tabs. Fires when *another* tab writes
+ * or clears this file's key (the `storage` event never fires in the writing tab,
+ * so there's no echo), passing the new value — `null` when it was removed, which
+ * also covers a whole-storage clear (`e.key === null`). Returns an unsubscribe
+ * function. Last write wins: a kept layer edited in one tab replaces the other's
+ * view of it, matching how the file-save 409 path treats external changes.
+ */
+export function subscribeAnnotations(
+  key: string,
+  onChange: (next: FileAnnotations | null) => void,
+): () => void {
+  const full = storageKey(key);
+  const handler = (e: StorageEvent) => {
+    if (e.key !== null && e.key !== full) return;
+    onChange(getAnnotations(key));
+  };
+  window.addEventListener('storage', handler);
+  return () => window.removeEventListener('storage', handler);
+}
+
 /** The width stepper (1–12) doubles as a text-size control for text marks; these
  *  map between the two so the same control reads back consistently on select. */
 export function textSizeFromWidth(w: number): number {

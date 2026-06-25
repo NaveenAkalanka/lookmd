@@ -20,6 +20,7 @@ import {
   setAnnotations,
   clearAnnotations,
   isPinned,
+  subscribeAnnotations,
 } from './annotations';
 
 export interface UseAnnotations {
@@ -67,6 +68,24 @@ export function useAnnotations(fileKey: string): UseAnnotations {
       setHist(EMPTY);
       setPinnedState(isPinned(fileKey));
     }
+  }, [fileKey]);
+
+  // Live-sync across tabs: when another tab writes/clears this file's kept layer,
+  // adopt it. History is reset (undo stacks can't be merged across tabs); a
+  // removed entry drops us back to an empty, unpinned layer.
+  useEffect(() => {
+    return subscribeAnnotations(fileKey, (next) => {
+      coalesceRef.current = null;
+      if (next) {
+        setHist({ past: [], present: next.marks, future: [] });
+        setPinnedState(true);
+        pinnedRef.current = true;
+      } else {
+        setHist(EMPTY);
+        setPinnedState(false);
+        pinnedRef.current = false;
+      }
+    });
   }, [fileKey]);
 
   const persist = useCallback((next: Mark[]) => {
