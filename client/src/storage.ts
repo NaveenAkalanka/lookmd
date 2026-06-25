@@ -69,6 +69,20 @@ export function addRecent(ws: Workspace): void {
   write(RECENTS_KEY, next);
 }
 
+/** Drop one entry from the recent list (matched by source kind + root). Returns
+ *  the updated list. The FSA handle in IndexedDB, if any, is the caller's to
+ *  remove — storage.ts only owns the localStorage record. */
+export function removeRecent(kind: SourceKind, root: string): RecentWorkspace[] {
+  const next = getRecents().filter((r) => !(r.kind === kind && r.root === root));
+  write(RECENTS_KEY, next);
+  return next;
+}
+
+/** Clear the entire recent-workspace history (localStorage record only). */
+export function clearRecents(): void {
+  write(RECENTS_KEY, []);
+}
+
 export function getLastWorkspace(): Workspace | null {
   const ws = read<Workspace | null>(LAST_KEY, null);
   return ws ? normalize(ws) : null;
