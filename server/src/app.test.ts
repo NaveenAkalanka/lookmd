@@ -75,6 +75,11 @@ describe('GET /api/health', () => {
     assert.equal(res.headers['x-frame-options'], 'DENY');
     assert.equal(res.headers['referrer-policy'], 'no-referrer');
   });
+
+  it('does NOT set the document CSP in API-only mode (no static dir)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/health' });
+    assert.equal(res.headers['content-security-policy'], undefined);
+  });
 });
 
 describe('GET /api/folders', () => {
@@ -200,6 +205,40 @@ describe('GET /api/raw', () => {
     const res = await app.inject({ method: 'GET', url: '/api/raw?root=ws&path=../other.md' });
     assert.equal(res.statusCode, 403);
     assert.equal((res.json() as ApiError).code, 'OUTSIDE_ROOT');
+  });
+});
+
+describe('production static serving (LOOKMD_STATIC_DIR)', () => {
+  it('serves index.html with a document CSP, and falls back for SPA routes', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lookmd-static-'));
+    fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html><title>x</title>');
+    const prev = process.env.LOOKMD_STATIC_DIR;
+    process.env.LOOKMD_STATIC_DIR = dir;
+    const staticApp = buildApp({ base, host: '127.0.0.1', port: 0, allowWrite: false });
+    await staticApp.ready();
+    try {
+      const root = await staticApp.inject({ method: 'GET', url: '/' });
+      assert.equal(root.statusCode, 200);
+      const csp = root.headers['content-security-policy'] as string;
+      assert.match(csp, /default-src 'self'/);
+      assert.match(csp, /script-src 'self'/);
+      assert.match(csp, /frame-ancestors 'none'/);
+
+      // Unknown non-API GET falls back to index.html (SPA refresh on any path).
+      const spa = await staticApp.inject({ method: 'GET', url: '/notes/anything' });
+      assert.equal(spa.statusCode, 200);
+      assert.match(spa.headers['content-security-policy'] as string, /default-src 'self'/);
+
+      // Unknown /api path still returns a JSON 404, not the SPA.
+      const api404 = await staticApp.inject({ method: 'GET', url: '/api/nope' });
+      assert.equal(api404.statusCode, 404);
+      assert.equal((api404.json() as ApiError).code, 'NOT_FOUND');
+    } finally {
+      await staticApp.close();
+      if (prev === undefined) delete process.env.LOOKMD_STATIC_DIR;
+      else process.env.LOOKMD_STATIC_DIR = prev;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

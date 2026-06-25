@@ -43,8 +43,37 @@ function requireString(value: unknown, field: string): string {
  *  which silently 413s legitimate large saves. */
 const BODY_LIMIT_BYTES = 25 * 1024 * 1024;
 
+/**
+ * Document Content-Security-Policy for the served SPA (production single-origin
+ * only). Tuned to exactly what the built client needs:
+ *   - script-src 'self'      — the build emits only an external module script
+ *                              (verified: no inline <script> in index.html).
+ *   - style-src 'unsafe-inline' — CodeMirror and React inject inline styles.
+ *   - img-src … https:        — Markdown may reference external image URLs; blob:
+ *                              covers File System Access object URLs.
+ *   - connect-src 'self'      — fetch /api and the same-origin /ws WebSocket.
+ * Everything else is locked to 'self' / 'none'. The dev server (Vite) never
+ * serves through here, so this can't interfere with HMR.
+ */
+const APP_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
 export function buildApp(config: Config): FastifyInstance {
   const app = Fastify({ logger: false, bodyLimit: BODY_LIMIT_BYTES });
+
+  // Whether this process also serves the built client (production single-origin).
+  // Computed once so the header hook and the static registration agree.
+  const staticDir = process.env.LOOKMD_STATIC_DIR;
+  const serveStatic = !!(staticDir && fs.existsSync(staticDir));
 
   // Baseline hardening headers on every response (incl. errors and static
   // assets). Cheap, never breaks a same-origin SPA, and closes MIME-sniffing
@@ -53,6 +82,9 @@ export function buildApp(config: Config): FastifyInstance {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'no-referrer');
+    // Document CSP only when we serve the SPA. (/api/raw overrides this with its
+    // own stricter sandbox CSP inside its handler.)
+    if (serveStatic) reply.header('Content-Security-Policy', APP_CSP);
   });
 
   app.get('/api/health', async () => ({ ok: true, allowWrite: config.allowWrite }));
@@ -136,9 +168,8 @@ export function buildApp(config: Config): FastifyInstance {
   // LOOKMD_STATIC_DIR points at the client build — dev and tests leave it unset,
   // so they keep the pure-API behaviour. Non-asset GETs fall back to index.html
   // so a refresh on any path still loads the SPA; /api and /ws keep JSON 404s.
-  const staticDir = process.env.LOOKMD_STATIC_DIR;
-  if (staticDir && fs.existsSync(staticDir)) {
-    app.register(fastifyStatic, { root: path.resolve(staticDir), wildcard: false });
+  if (serveStatic) {
+    app.register(fastifyStatic, { root: path.resolve(staticDir!), wildcard: false });
     app.setNotFoundHandler((req, reply) => {
       if (req.method === 'GET' && !req.url.startsWith('/api') && !req.url.startsWith('/ws')) {
         return reply.sendFile('index.html');
