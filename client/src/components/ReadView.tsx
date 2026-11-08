@@ -1,6 +1,9 @@
 /**
- * Read mode: client-side Markdown render. react-markdown does not emit raw HTML
- * by default, so untrusted file content can't inject markup. GFM adds tables,
+ * Read mode: client-side Markdown render. Raw HTML in the file is never rendered,
+ * so untrusted content can't inject markup — and with `skipHtml` the tags are
+ * dropped rather than printed as literal text (`<div align="center">` noise);
+ * the Markdown between them still renders, and Source mode shows the raw tags.
+ * GFM adds tables,
  * task lists, strikethrough, and autolinks. rehype-highlight attaches semantic
  * highlight.js classes to fenced code blocks; their colors come from the shared
  * --syntax-* tokens in CSS (no highlight.js theme is imported).
@@ -71,7 +74,12 @@ export function ReadView({ content, resolveImage, onNavigate }: Props) {
 
   return (
     <article className="read">
-      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
+      <ReactMarkdown
+        skipHtml
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={components}
+      >
         {content}
       </ReactMarkdown>
     </article>

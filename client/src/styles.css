@@ -7,6 +7,17 @@
  *   --accent    primary action color (brand, buttons, caret)
  *   --accent-2  highlight color (links, active file, selection) — equals
  *               --accent in every theme except Sanctum, where it is gold.
+ *   --on-accent / --on-accent-2
+ *               text drawn on an --accent / --accent-2 fill. Default to
+ *               --surface; a theme overrides them only when --surface fails
+ *               4.5:1 on its fill.
+ *   --link      link text in the Read view. Defaults to --accent-2; a theme
+ *               overrides it (same hue, darker/lighter) when --accent-2 fails
+ *               4.5:1 as text on --background / --surface.
+ *
+ * Contrast floors every theme meets: --text-primary ≥ 7:1, --text-secondary
+ * and --link ≥ 4.5:1, --text-tertiary ≥ 3:1 (de-emphasised labels only), all
+ * on both --background and --surface. Check a new theme against them.
  *
  * The default set (no data-theme, or data-theme="paper") is "Paper" (warm light).
  */
@@ -18,6 +29,9 @@
   --text-tertiary: #8a8178;
   --accent: #9a5b34;
   --accent-2: var(--accent);
+  --on-accent: var(--surface);
+  --on-accent-2: var(--surface);
+  --link: var(--accent-2);
   --border: #e3dccf;
   --danger: #b3261e;
 
@@ -127,7 +141,7 @@
   --surface: #ffffff;
   --text-primary: #14202e;
   --text-secondary: #45576b;
-  --text-tertiary: #8295a8;
+  --text-tertiary: #7a8d9f;
   --accent: #2563eb;
   --accent-2: var(--accent);
   --border: #d7e0ea;
@@ -187,6 +201,7 @@
   --text-tertiary: #7e735b;
   --accent: #9a1f23;
   --accent-2: #c9a227;
+  --on-accent: var(--text-primary);
   --border: #2b211f;
   --danger: #e2575c;
   --syntax-keyword: #c0392b;
@@ -240,7 +255,7 @@
   --surface: #313244;
   --text-primary: #cdd6f4;
   --text-secondary: #a6adc8;
-  --text-tertiary: #6c7086;
+  --text-tertiary: #777b92;
   --accent: #cba6f7;
   --accent-2: #89b4fa;
   --border: #45475a;
@@ -267,10 +282,11 @@
   --background: #eff1f5;
   --surface: #ffffff;
   --text-primary: #4c4f69;
-  --text-secondary: #6c6f85;
-  --text-tertiary: #9ca0b0;
+  --text-secondary: #696c83;
+  --text-tertiary: #868a9d;
   --accent: #8839ef;
   --accent-2: #1e66f5;
+  --link: #1d63ee;
   --border: #ccd0da;
   --danger: #d20f39;
   --syntax-keyword: #8839ef;
@@ -296,7 +312,7 @@
   --surface: #24253e;
   --text-primary: #c0caf5;
   --text-secondary: #9aa5ce;
-  --text-tertiary: #565f89;
+  --text-tertiary: #656e98;
   --accent: #7aa2f7;
   --accent-2: #bb9af7;
   --border: #2f3154;
@@ -352,7 +368,7 @@
   --surface: #26233a;
   --text-primary: #e0def4;
   --text-secondary: #908caa;
-  --text-tertiary: #6e6a86;
+  --text-tertiary: #706c88;
   --accent: #c4a7e7;
   --accent-2: #ebbcba;
   --border: #393552;
@@ -378,11 +394,14 @@
 [data-theme='solarized'] {
   --background: #fdf6e3;
   --surface: #eee8d5;
-  --text-primary: #657b83;
-  --text-secondary: #839496;
-  --text-tertiary: #93a1a1;
+  --text-primary: #404d53;
+  --text-secondary: #5c6b6f;
+  --text-tertiary: #798789;
   --accent: #268bd2;
   --accent-2: var(--accent);
+  --on-accent: #1a1f21;
+  --on-accent-2: var(--on-accent);
+  --link: #1e6ca4;
   --border: #d3cdb8;
   --danger: #dc322f;
   --syntax-keyword: #859900;
@@ -436,7 +455,7 @@
   --surface: #161b22;
   --text-primary: #c9d1d9;
   --text-secondary: #8b949e;
-  --text-tertiary: #484f58;
+  --text-tertiary: #616871;
   --accent: #58a6ff;
   --accent-2: #79c0ff;
   --border: #21262d;
@@ -464,7 +483,7 @@
   --surface: #192c1a;
   --text-primary: #d4e6c3;
   --text-secondary: #8daa7a;
-  --text-tertiary: #4d6a45;
+  --text-tertiary: #5c7853;
   --accent: #6abf5e;
   --accent-2: #a3cf91;
   --border: #2a3d22;
@@ -492,7 +511,7 @@
   --surface: #141414;
   --text-primary: #e2e2e2;
   --text-secondary: #a0a0a0;
-  --text-tertiary: #505050;
+  --text-tertiary: #626262;
   --accent: #a78bfa;
   --accent-2: var(--accent);
   --border: #242424;
@@ -520,7 +539,7 @@
   --surface: #261b0c;
   --text-primary: #f5e6c8;
   --text-secondary: #c9a46a;
-  --text-tertiary: #7a5c2e;
+  --text-tertiary: #806336;
   --accent: #f59e0b;
   --accent-2: #fcd34d;
   --border: #3d2a10;
@@ -548,7 +567,7 @@
   --surface: #261e16;
   --text-primary: #e8d5b7;
   --text-secondary: #b89e80;
-  --text-tertiary: #6b5540;
+  --text-tertiary: #7b664f;
   --accent: #d4956a;
   --accent-2: #e8c49a;
   --border: #3a2d20;
@@ -576,7 +595,7 @@
   --surface: #14141f;
   --text-primary: #e0e0f0;
   --text-secondary: #9090b0;
-  --text-tertiary: #505070;
+  --text-tertiary: #60607e;
   --accent: #e040fb;
   --accent-2: #00e5ff;
   --border: #222235;
@@ -634,7 +653,7 @@
   --surface: #0a121f;
   --text-primary: #cfe0f2;
   --text-secondary: #7e93ad;
-  --text-tertiary: #4a5a72;
+  --text-tertiary: #52627a;
   --accent: #3aa0ff;
   --accent-2: #34d3c0;
   --border: #14202f;
@@ -662,7 +681,7 @@
   --surface: #121212;
   --text-primary: #eaeaea;
   --text-secondary: #9e9e9e;
-  --text-tertiary: #5a5a5a;
+  --text-tertiary: #616161;
   --accent: #cfcfcf;
   --accent-2: #8f8f8f;
   --border: #1f1f1f;
@@ -692,7 +711,7 @@
   --surface: #f6f8fa;
   --text-primary: #1f2328;
   --text-secondary: #57606a;
-  --text-tertiary: #8c959f;
+  --text-tertiary: #88909a;
   --accent: #0969da;
   --accent-2: var(--accent);
   --border: #d1d9e0;
@@ -720,9 +739,12 @@
   --surface: #ffffff;
   --text-primary: #383a42;
   --text-secondary: #696c77;
-  --text-tertiary: #a0a1a7;
+  --text-tertiary: #8f9197;
   --accent: #4078f2;
   --accent-2: var(--accent);
+  --on-accent: #151518;
+  --on-accent-2: var(--on-accent);
+  --link: #3a6ddc;
   --border: #e5e5e6;
   --danger: #e45649;
   --syntax-keyword: #a626a4;
@@ -746,11 +768,14 @@
 [data-theme='ayu-light'] {
   --background: #fafafa;
   --surface: #ffffff;
-  --text-primary: #5c6166;
-  --text-secondary: #828c99;
-  --text-tertiary: #abb0b6;
+  --text-primary: #52565b;
+  --text-secondary: #6d747e;
+  --text-tertiary: #8d9197;
   --accent: #ff9940;
   --accent-2: #fa8d3e;
+  --on-accent: #424549;
+  --on-accent-2: #3c3f42;
+  --link: #aa602a;
   --border: #e7e8e9;
   --danger: #f07171;
   --syntax-keyword: #fa8d3e;
@@ -776,9 +801,11 @@
   --surface: #f2e5bc;
   --text-primary: #3c3836;
   --text-secondary: #665c54;
-  --text-tertiary: #928374;
+  --text-tertiary: #8f8172;
   --accent: #af3a03;
   --accent-2: #d65d0e;
+  --on-accent-2: #1b1918;
+  --link: #a9490b;
   --border: #ebdbb2;
   --danger: #9d0006;
   --syntax-keyword: #9d0006;
@@ -802,11 +829,14 @@
 [data-theme='rose-pine-dawn'] {
   --background: #faf4ed;
   --surface: #fffaf3;
-  --text-primary: #575279;
-  --text-secondary: #797593;
-  --text-tertiary: #9893a5;
+  --text-primary: #534e73;
+  --text-secondary: #716d8c;
+  --text-tertiary: #908ba0;
   --accent: #d7827e;
   --accent-2: #907aa9;
+  --on-accent: #322f45;
+  --on-accent-2: #1b1a26;
+  --link: #7a6890;
   --border: #f2e9e1;
   --danger: #b4637a;
   --syntax-keyword: #286983;
@@ -830,11 +860,14 @@
 [data-theme='everforest'] {
   --background: #fdf6e3;
   --surface: #f4f0d9;
-  --text-primary: #5c6a72;
-  --text-secondary: #829181;
-  --text-tertiary: #a6b0a0;
+  --text-primary: #475258;
+  --text-secondary: #63706c;
+  --text-tertiary: #828c85;
   --accent: #8da101;
   --accent-2: #35a77c;
+  --on-accent: #2b3135;
+  --on-accent-2: #282f32;
+  --link: #277a5b;
   --border: #eceadb;
   --danger: #f85552;
   --syntax-keyword: #f85552;
@@ -859,10 +892,13 @@
   --background: #e1e2e7;
   --surface: #e9e9ed;
   --text-primary: #2c3043;
-  --text-secondary: #6172b0;
-  --text-tertiary: #848cb5;
+  --text-secondary: #546296;
+  --text-tertiary: #787fa5;
   --accent: #2e7de9;
   --accent-2: #9854f1;
+  --on-accent: #13151d;
+  --on-accent-2: #0c0d13;
+  --link: #7e46c8;
   --border: #cfd2e0;
   --danger: #f52a65;
   --syntax-keyword: #9854f1;
@@ -891,6 +927,9 @@
   --text-tertiary: #7b8394;
   --accent: #5e81ac;
   --accent-2: #81a1c1;
+  --on-accent: #13151a;
+  --on-accent-2: var(--text-primary);
+  --link: #556a7f;
   --border: #d8dee9;
   --danger: #bf616a;
   --syntax-keyword: #5e81ac;
@@ -916,9 +955,12 @@
   --surface: #ffffff;
   --text-primary: #2b2f36;
   --text-secondary: #5b626c;
-  --text-tertiary: #9aa1ab;
+  --text-tertiary: #878e97;
   --accent: #5b6ee1;
   --accent-2: #2bb2a6;
+  --on-accent: #09090b;
+  --on-accent-2: var(--text-primary);
+  --link: #1e7d74;
   --border: #e2e5ea;
   --danger: #d6455d;
   --syntax-keyword: #7a3ee0;
@@ -944,9 +986,11 @@
   --surface: #fbf6e9;
   --text-primary: #433422;
   --text-secondary: #6b5a44;
-  --text-tertiary: #9a8a73;
+  --text-tertiary: #96866f;
   --accent: #8a5a2b;
   --accent-2: #a3791f;
+  --on-accent-2: #1d160f;
+  --link: #87641a;
   --border: #e6dcc4;
   --danger: #a23b2e;
   --syntax-keyword: #8c3b3b;
@@ -972,9 +1016,12 @@
   --surface: #ffffff;
   --text-primary: #1f3b30;
   --text-secondary: #4a6b5d;
-  --text-tertiary: #87a297;
+  --text-tertiary: #7b968b;
   --accent: #0f9d6b;
   --accent-2: #0bb39a;
+  --on-accent: #142720;
+  --on-accent-2: var(--text-primary);
+  --link: #08816f;
   --border: #d9ece3;
   --danger: #d6455d;
   --syntax-keyword: #0e8a86;
@@ -1000,9 +1047,12 @@
   --surface: #ffffff;
   --text-primary: #16314d;
   --text-secondary: #436585;
-  --text-tertiary: #8aa6c0;
+  --text-tertiary: #7490aa;
   --accent: #1184e8;
   --accent-2: #00a3c4;
+  --on-accent: #0d1c2c;
+  --on-accent-2: #16304b;
+  --link: #007a93;
   --border: #d6e6f4;
   --danger: #e0496b;
   --syntax-keyword: #6b5bd6;
@@ -1028,9 +1078,12 @@
   --surface: #fdf9f1;
   --text-primary: #3a332a;
   --text-secondary: #6a5f4f;
-  --text-tertiary: #9c8f78;
+  --text-tertiary: #968973;
   --accent: #b06a3a;
   --accent-2: #c89b3c;
+  --on-accent: #110f0d;
+  --on-accent-2: var(--text-primary);
+  --link: #866828;
   --border: #e7ddcb;
   --danger: #b23a32;
   --syntax-keyword: #a23f54;
@@ -1212,6 +1265,17 @@ button, .btn, input[type='text'], input[type='search'], select {
   background: transparent;
 }
 
+/* --- Focus + selection --------------------------------------------------- */
+/* One themed keyboard-focus ring for every control (mouse clicks don't show
+ * it). Components that draw their own focus state keep it; this is the floor. */
+:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+::selection {
+  background: color-mix(in srgb, var(--accent-2) 28%, transparent);
+}
+
 /* --- Buttons ------------------------------------------------------------- */
 .btn {
   display: inline-flex;
@@ -1236,7 +1300,7 @@ button, .btn, input[type='text'], input[type='search'], select {
 }
 .btn-accent {
   background: var(--accent);
-  color: var(--surface);
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 .icon-btn {
@@ -1695,8 +1759,11 @@ body.resizing-col .sidebar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  /* 24px target; padding reset so the browser's default button padding
+   * doesn't squeeze the icon inside the fixed box. */
+  width: 24px;
+  height: 24px;
+  padding: 0;
   flex-shrink: 0;
   border: none;
   border-radius: 4px;
@@ -1734,7 +1801,7 @@ body.resizing-col .sidebar {
   white-space: nowrap;
 }
 .dirty-dot {
-  color: var(--accent-2);
+  color: var(--link);
   font-size: 12px;
   line-height: 1;
 }
@@ -1755,6 +1822,7 @@ body.resizing-col .sidebar {
   justify-content: center;
   width: 24px;
   height: 24px;
+  padding: 0;
   background: transparent;
   border: none;
   color: var(--text-secondary);
@@ -1810,10 +1878,10 @@ body.resizing-col .sidebar {
 }
 .segmented-item-active {
   background: var(--accent-2);
-  color: var(--surface);
+  color: var(--on-accent-2);
 }
 .segmented-item-active:hover {
-  color: var(--surface);
+  color: var(--on-accent-2);
 }
 .segmented-item:disabled {
   opacity: 0.5;
@@ -2788,10 +2856,10 @@ body.resizing-col .sidebar {
 .tree-file-active,
 .tree-row-wrap:hover > .tree-row.tree-file-active {
   background: var(--accent-2);
-  color: var(--surface);
+  color: var(--on-accent-2);
 }
 .tree-file-active .tree-icon {
-  color: color-mix(in srgb, var(--surface) 80%, transparent);
+  color: color-mix(in srgb, var(--on-accent-2) 80%, transparent);
 }
 
 /* --- Workspace picker ---------------------------------------------------- */
@@ -2974,7 +3042,13 @@ body.resizing-col .sidebar {
   margin: 0 0 1em;
 }
 .read a {
-  color: var(--accent-2);
+  color: var(--link);
+}
+.read hr {
+  height: 0;
+  margin: 2em 0;
+  border: 0;
+  border-top: 1px solid var(--border);
 }
 /* Internal links (other workspace files, wikilinks) read as a softer, dashed
  * affordance to distinguish them from external links. */
