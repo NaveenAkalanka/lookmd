@@ -6,14 +6,17 @@
  * editor. All colors/fonts come from CSS custom properties via `themeFromTokens`
  * — the editor obeys the active theme like every other component.
  *
- * Line endings are never normalized here: CodeMirror edits the exact string we
- * give it and `onChange` reports the exact string back, so CRLF survives.
+ * Line endings: CodeMirror stores every line break as `\n` internally, so
+ * `doc.toString()` alone would silently turn a CRLF file into LF. We detect the
+ * file's line ending when a document is loaded and restore it on every change
+ * (`toFileText`), so CRLF and LF files round-trip byte-for-byte. A file that
+ * mixes both is written back in its majority ending once it is edited.
  */
 
 import { useEffect, useRef } from 'react';
 import { basicSetup } from 'codemirror';
 import { EditorView, keymap } from '@codemirror/view';
-import { EditorState, Prec } from '@codemirror/state';
+import { Annotation, EditorState, Prec } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { undo, redo } from '@codemirror/commands';
@@ -176,6 +179,24 @@ const lookmdHighlightStyle = HighlightStyle.define([
   { tag: t.invalid, color: 'var(--danger)' },
 ]);
 
+type Eol = '\r\n' | '\n';
+
+/** The line ending a file predominantly uses (LF on a tie or no breaks). */
+export function detectEol(text: string): Eol {
+  const crlf = text.match(/\r\n/g)?.length ?? 0;
+  const lf = (text.match(/\n/g)?.length ?? 0) - crlf;
+  return crlf > lf ? '\r\n' : '\n';
+}
+
+/** Turn CodeMirror's `\n`-joined document back into the file's line ending. */
+export function toFileText(docText: string, eol: Eol): string {
+  return eol === '\n' ? docText : docText.replace(/\n/g, '\r\n');
+}
+
+/** Marks the programmatic document swap on file switch, which is a load, not
+ *  an edit — it must not be reported as a draft change. */
+const documentLoad = Annotation.define<boolean>();
+
 export function Editor({
   value,
   docKey,
@@ -199,6 +220,8 @@ export function Editor({
   onSaveRef.current = onSave;
   valueRef.current = value;
   onFocusApiRef.current = onFocusApi;
+  // Line ending of the loaded file; reset whenever a new document is loaded.
+  const eolRef = useRef<Eol>(detectEol(value));
 
   // A stable command API for the Edit menu, bound to this editor's view.
   const apiRef = useRef<EditorApi | null>(null);
@@ -277,8 +300,9 @@ export function Editor({
           themeFromTokens,
           EditorView.lineWrapping,
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
-              onChangeRef.current(update.state.doc.toString());
+            const isLoad = update.transactions.some((tr) => tr.annotation(documentLoad));
+            if (update.docChanged && !isLoad) {
+              onChangeRef.current(toFileText(update.state.doc.toString(), eolRef.current));
             }
             // Register as the active editor for the Edit menu on focus.
             if (update.focusChanged && update.view.hasFocus && apiRef.current) {
@@ -323,8 +347,10 @@ export function Editor({
     if (!view) return;
     if (lastDocKey.current === docKey) return;
     lastDocKey.current = docKey;
+    eolRef.current = detectEol(value);
     view.dispatch({
       changes: { from: 0, to: view.state.doc.length, insert: value },
+      annotations: documentLoad.of(true),
     });
   }, [docKey, value]);
 
