@@ -363,10 +363,17 @@ export async function createFolder(
   assertNoSymlinkEscape(base, resolved.rootAbs);
   assertNoSymlinkEscape(resolved.rootAbs, resolved.targetAbs);
 
-  if (fs.existsSync(resolved.targetAbs)) {
-    throw new HttpError(409, 'ALREADY_EXISTS', `folder already exists: ${relPath}`);
+  // Parents may already exist; the final mkdir is non-recursive so it fails
+  // with EEXIST atomically instead of a check-then-create race.
+  await fsp.mkdir(path.dirname(resolved.targetAbs), { recursive: true });
+  try {
+    await fsp.mkdir(resolved.targetAbs);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw new HttpError(409, 'ALREADY_EXISTS', `folder already exists: ${relPath}`);
+    }
+    throw err;
   }
-  await fsp.mkdir(resolved.targetAbs, { recursive: true });
 
   return { path: toPosix(path.relative(resolved.rootAbs, resolved.targetAbs)), created: true };
 }
@@ -396,6 +403,34 @@ export async function deleteFile(
   return { path: toPosix(path.relative(rootAbs, targetAbs)), deleted: true };
 }
 
+/** Errors from `link` meaning "this filesystem can't hard-link here", as
+ *  opposed to a real failure: FAT/exFAT, some network shares, cross-device. */
+const NO_LINK = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV', 'ENOSYS', 'EINVAL']);
+
+/**
+ * Move a file without ever replacing an existing destination. `rename` would
+ * overwrite one (on POSIX, and on Windows too via Node), and checking first is
+ * a race. Instead the new name is claimed atomically — a hard link, or an
+ * exclusive copy where links aren't supported — and fails with EEXIST if
+ * taken; only then is the old name removed.
+ */
+async function moveNoClobber(fromAbs: string, toAbs: string): Promise<void> {
+  try {
+    await fsp.link(fromAbs, toAbs);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (!code || !NO_LINK.has(code)) throw err;
+    await fsp.copyFile(fromAbs, toAbs, fs.constants.COPYFILE_EXCL);
+  }
+  try {
+    await fsp.unlink(fromAbs);
+  } catch (err) {
+    // Leave things as they were rather than with the file under two names.
+    await fsp.unlink(toAbs).catch(() => {});
+    throw err;
+  }
+}
+
 /** POST /api/move — rename/move a file within the same workspace root. 404 if
  *  the source is missing, 409 if the destination already exists. */
 export async function moveFile(
@@ -420,13 +455,15 @@ export async function moveFile(
     throw new HttpError(400, 'INVALID_PATH', `cannot move a directory: ${from}`);
   }
 
-  // Never silently overwrite an existing destination.
-  if (fs.existsSync(dst.targetAbs)) {
-    throw new HttpError(409, 'ALREADY_EXISTS', `destination already exists: ${to}`);
-  }
-
   await fsp.mkdir(path.dirname(dst.targetAbs), { recursive: true });
-  await fsp.rename(src.targetAbs, dst.targetAbs);
+  try {
+    await moveNoClobber(src.targetAbs, dst.targetAbs);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw new HttpError(409, 'ALREADY_EXISTS', `destination already exists: ${to}`);
+    }
+    throw err;
+  }
 
   return {
     from: toPosix(path.relative(src.rootAbs, src.targetAbs)),

@@ -157,6 +157,28 @@ describe('POST /api/move (rename)', () => {
     assert.equal(fs.readFileSync(wsAbs('b.md'), 'utf8'), '2');
   });
 
+  it('two concurrent moves to one destination: one wins, nothing is lost', async () => {
+    for (let round = 0; round < 20; round++) {
+      fs.rmSync(path.join(base, WS), { recursive: true, force: true });
+      fs.mkdirSync(path.join(base, WS), { recursive: true });
+      fs.writeFileSync(wsAbs('x.md'), 'x');
+      fs.writeFileSync(wsAbs('y.md'), 'y');
+      const [rx, ry] = await Promise.all(
+        ['x.md', 'y.md'].map((from) =>
+          app.inject({ method: 'POST', url: '/api/move', payload: { root: WS, from, to: 'dst.md' } }),
+        ),
+      );
+      const codes = [rx!.statusCode, ry!.statusCode].sort();
+      assert.deepEqual(codes, [200, 409], `round ${round}`);
+      // The loser's source is untouched; the destination holds the winner's content.
+      const loser = rx!.statusCode === 409 ? 'x.md' : 'y.md';
+      const winner = loser === 'x.md' ? 'y' : 'x';
+      assert.equal(fs.readFileSync(wsAbs(loser), 'utf8'), loser[0]);
+      assert.equal(fs.readFileSync(wsAbs('dst.md'), 'utf8'), winner);
+      assert.equal(fs.existsSync(wsAbs(`${winner}.md`)), false);
+    }
+  });
+
   it('403s when destination escapes the root', async () => {
     fs.writeFileSync(wsAbs('c.md'), '1');
     const res = await app.inject({
@@ -166,6 +188,31 @@ describe('POST /api/move (rename)', () => {
     });
     assert.equal(res.statusCode, 403);
     assert.equal((res.json() as ApiError).code, 'OUTSIDE_ROOT');
+  });
+});
+
+describe('POST /api/folder (create)', () => {
+  it('creates nested folders', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/folder', payload: { root: WS, path: 'p/q' } });
+    assert.equal(res.statusCode, 201);
+    assert.equal(fs.statSync(wsAbs('p/q')).isDirectory(), true);
+  });
+
+  it('409s when the folder exists, and exactly one of two concurrent creates wins', async () => {
+    fs.mkdirSync(wsAbs('have'));
+    const dup = await app.inject({ method: 'POST', url: '/api/folder', payload: { root: WS, path: 'have' } });
+    assert.equal(dup.statusCode, 409);
+    const both = await Promise.all(
+      [1, 2].map(() => app.inject({ method: 'POST', url: '/api/folder', payload: { root: WS, path: 'race' } })),
+    );
+    assert.deepEqual(both.map((r) => r.statusCode).sort(), [201, 409]);
+  });
+
+  it('409s when a file already has that name', async () => {
+    fs.writeFileSync(wsAbs('taken.md'), '1');
+    const res = await app.inject({ method: 'POST', url: '/api/folder', payload: { root: WS, path: 'taken.md' } });
+    assert.equal(res.statusCode, 409);
+    assert.equal(fs.readFileSync(wsAbs('taken.md'), 'utf8'), '1');
   });
 });
 
