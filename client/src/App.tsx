@@ -14,11 +14,16 @@ import { createRestSource } from './sources/rest';
 import type { FileSource } from './sources/types';
 import {
   addRecent,
+  getRecents,
   getLastWorkspace,
   setLastWorkspace,
   getSession,
   setSession,
+  workspaceFromSearch,
+  searchWithWorkspace,
+  workspaceName,
   type Workspace,
+  type WorkspaceRef,
   type Session,
 } from './storage';
 import { getHandle } from './sources/handles';
@@ -135,16 +140,35 @@ function ensureExt(name: string, ext: 'md' | 'txt'): string {
   return /\.(md|markdown|mdown|mkd|txt|text)$/i.test(name) ? name : `${name}.${ext}`;
 }
 
+/** The workspace this tab should open on load: the one named in its URL
+ *  (`?ws=`), else the last one opened in any tab. A URL workspace takes its
+ *  display name from the recents list when it's there. */
+function bootWorkspace(): Workspace | null {
+  const ref = workspaceFromSearch(window.location.search);
+  if (!ref) return getLastWorkspace();
+  const known = [getLastWorkspace(), ...getRecents()].find(
+    (w) => w && w.kind === ref.kind && w.root === ref.root,
+  );
+  if (known) return { kind: known.kind, root: known.root, name: known.name };
+  return { ...ref, name: ref.kind === 'rest' ? workspaceName(ref.root) : 'Local folder' };
+}
+
+/** Point this tab's URL at a workspace (or none) without adding history. */
+function writeWorkspaceUrl(ws: WorkspaceRef | null): void {
+  const { pathname, search, hash } = window.location;
+  const next = searchWithWorkspace(search, ws);
+  if (next !== search) window.history.replaceState(window.history.state, '', pathname + next + hash);
+}
+
 export function App() {
   // Boot snapshot, read once: a REST workspace can be restored synchronously
   // (with its saved session) so the first render already has its tabs. FSA
-  // workspaces need a permission gesture, so they're restored in an effect.
+  // workspaces need a permission check, so they're restored in an effect.
   const [boot] = useState(() => {
-    const last = getLastWorkspace();
-    const ws = last && last.kind === 'rest' ? last : null;
-    const saved = ws ? getSession() : null;
-    const session = saved && ws && saved.kind === ws.kind && saved.root === ws.root ? saved : null;
-    return { ws, session };
+    const target = bootWorkspace();
+    const ws = target && target.kind === 'rest' ? target : null;
+    const session = ws ? getSession(ws.kind, ws.root) : null;
+    return { target, ws, session };
   });
 
   const [workspace, setWorkspace] = useState<Workspace | null>(boot.ws);
@@ -495,22 +519,27 @@ export function App() {
     if (boot.ws && boot.session && source) {
       boot.session.openPaths.forEach((p) => fetchInto(source, p));
     }
-    // Silent FSA restore: reopen the last local folder if permission persists.
-    if (!boot.ws) {
-      const last = getLastWorkspace();
-      if (last && last.kind === 'fsa') {
-        void (async () => {
-          const rec = await getHandle(last.root);
-          if (!rec || !(await hasPermission(rec.handle))) return;
-          const src = createFsaSource(rec.handle);
-          setWorkspace(last);
-          setSource(src);
-          const s = getSession();
-          if (s && s.kind === last.kind && s.root === last.root) restoreSession(s, src);
-        })();
-      }
+    // Silent FSA restore: reopen this tab's local folder if permission persists.
+    // Otherwise the tab stays on the picker (its URL keeps the folder's id).
+    const target = boot.target;
+    if (!boot.ws && target && target.kind === 'fsa') {
+      void (async () => {
+        const rec = await getHandle(target.root);
+        if (!rec || !(await hasPermission(rec.handle))) return;
+        const src = createFsaSource(rec.handle);
+        setWorkspace({ kind: 'fsa', root: target.root, name: rec.name });
+        setSource(src);
+        const s = getSession(target.kind, target.root);
+        if (s) restoreSession(s, src);
+      })();
     }
   }, [boot, source, fetchInto, restoreSession]);
+
+  // Keep this tab's URL naming its workspace, so a reload reopens it here even
+  // when another tab has since opened a different one.
+  useEffect(() => {
+    if (workspace) writeWorkspaceUrl(workspace);
+  }, [workspace]);
 
   // Persist the session whenever the open set, active tab, or mode changes.
   // Keyed off the paths string so per-keystroke draft edits don't trigger writes.
@@ -538,11 +567,12 @@ export function App() {
         setLastWorkspace(ws);
         addRecent(ws);
         // Reopen the tabs from a previous session for this same workspace.
-        const s = getSession();
-        if (s && s.kind === ws.kind && s.root === ws.root) restoreSession(s, src);
+        const s = getSession(ws.kind, ws.root);
+        if (s) restoreSession(s, src);
       } else {
         setWorkspace(null);
         setSource(null);
+        writeWorkspaceUrl(null);
       }
     },
     [anyDirty, restoreSession],
