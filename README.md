@@ -12,7 +12,7 @@ anywhere later.
 <br/>
 
 ![License](https://img.shields.io/badge/license-MIT-ee6e4f)
-![Node](https://img.shields.io/badge/node-%E2%89%A522-313f49)
+![Node](https://img.shields.io/badge/node-%E2%89%A522.18-313f49)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![React](https://img.shields.io/badge/React-19-61dafb)
 ![Fastify](https://img.shields.io/badge/Fastify-5-000000)
@@ -77,8 +77,9 @@ all rendering happens in the browser. Your `.md` files are touched only when
 
 ## Requirements
 
-- **Node.js 22 or newer.** The server runs TypeScript directly via Node's
-  built-in type stripping (no build step); tests use `node --test`.
+- **Node.js 22.18 or newer** on Windows, macOS, or Linux. The server runs
+  TypeScript directly via Node's built-in type stripping (unflagged since
+  22.18; no build step); tests use `node --test`.
 
 ## Quick start
 
