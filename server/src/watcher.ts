@@ -30,6 +30,32 @@ function debounce<T extends (...args: never[]) => void>(fn: T, ms: number): T {
   }) as T;
 }
 
+/** Debounce per key: a burst on one path collapses to one call, but distinct
+ *  paths changing in the same window each get their own call. */
+export function debounceByKey(
+  fn: (key: string) => void,
+  ms: number,
+): { call: (key: string) => void; cancel: () => void } {
+  const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  return {
+    call(key) {
+      const prev = timers.get(key);
+      if (prev) clearTimeout(prev);
+      timers.set(
+        key,
+        setTimeout(() => {
+          timers.delete(key);
+          fn(key);
+        }, ms),
+      );
+    },
+    cancel() {
+      timers.forEach(clearTimeout);
+      timers.clear();
+    },
+  };
+}
+
 function send(ws: WebSocket, msg: object): void {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
 }
@@ -70,14 +96,17 @@ export function attachWatcher(
 
     let watcher: FSWatcher | null = null;
 
+    // Tree reloads are whole-tree, so one shared debounce is right; content
+    // changes are per file, so each path debounces on its own.
     const onTree = debounce(() => send(ws, { type: 'tree' }), 80);
 
-    const onChange = debounce((absPath: string) => {
+    const changes = debounceByKey((absPath) => {
       const rel = path.relative(rootAbs, absPath);
       if (!rel || rel.startsWith('..')) return;
       if (!isAllowedFile(absPath)) return;
       send(ws, { type: 'change', path: toPosix(rel) });
     }, 80);
+    const onChange = (absPath: string) => changes.call(absPath);
 
     watcher = chokidar.watch(rootAbs, {
       ignoreInitial: true,
@@ -93,14 +122,12 @@ export function attachWatcher(
       .on('unlinkDir', onTree)
       .on('change', onChange);
 
-    ws.on('close', () => {
+    const stop = () => {
+      changes.cancel();
       void watcher?.close();
       watcher = null;
-    });
-
-    ws.on('error', () => {
-      void watcher?.close();
-      watcher = null;
-    });
+    };
+    ws.on('close', stop);
+    ws.on('error', stop);
   });
 }
