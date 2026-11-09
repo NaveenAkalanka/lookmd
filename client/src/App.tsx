@@ -1112,8 +1112,14 @@ export function App() {
         <span className="workspace-name" title={workspace.root || '/'}>
           {workspace.name}
         </span>
-        <button className="btn" onClick={() => switchWorkspace(null)}>
-          Change workspace
+        <button
+          className="btn change-workspace"
+          title="Change workspace"
+          aria-label="Change workspace"
+          onClick={() => switchWorkspace(null)}
+        >
+          <Icon icon={Folder01Icon} size={16} />
+          <span className="btn-label">Change workspace</span>
         </button>
         {settingsButton}
       </header>

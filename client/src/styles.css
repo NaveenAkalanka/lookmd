@@ -1275,6 +1275,14 @@ button, .btn, input[type='text'], input[type='search'], select {
 ::selection {
   background: color-mix(in srgb, var(--accent-2) 28%, transparent);
 }
+/* Android/iOS flash a blue box on tap; controls already have their own
+   pressed and focus styles from the theme. */
+button,
+a,
+[role='button'],
+[role='tab'] {
+  -webkit-tap-highlight-color: transparent;
+}
 
 /* --- Buttons ------------------------------------------------------------- */
 .btn {
@@ -2989,6 +2997,12 @@ body.resizing-col .sidebar {
 .picker-recent-remove:focus-visible {
   opacity: 1;
 }
+/* Touch screens have no hover to reveal it, so keep it visible there. */
+@media (hover: none) {
+  .picker-recent-remove {
+    opacity: 1;
+  }
+}
 .picker-recent-remove:hover {
   color: var(--danger);
   border-color: var(--border);
@@ -3290,5 +3304,22 @@ body.resizing-col .sidebar {
 @media (max-width: 420px) {
   .workspace-name {
     display: none;
+  }
+  /* Icon only on phones; the button keeps its aria-label. */
+  .change-workspace .btn-label {
+    display: none;
+  }
+}
+
+/* Header controls never wrap their labels onto two lines. */
+.topbar .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Touch screens: a finger needs a taller target than a mouse pointer. */
+@media (pointer: coarse) {
+  .btn {
+    min-height: 36px;
   }
 }
