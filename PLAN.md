@@ -72,8 +72,22 @@ something to look at; the backend is where the rigor lives.
 
 ## Explicitly deferred (v1.1+)
 
-Docker / packaging · WebSocket file-watching · full-filesystem browser ·
-per-workspace settings · Tailscale / public-deployment split · live split preview.
+Server-side full-filesystem browser (the server picker stays base-scoped) ·
+per-workspace settings files · auth beyond Tailscale gating.
+
+### Shipped since the MVP plan
+
+- Docker / packaging: a single-origin multi-stage image (Fastify serves the
+  built client and the API on one port).
+- WebSocket file-watching (`server/src/watcher.ts`): clean open files reload,
+  dirty ones are flagged.
+- Live split preview while editing.
+- Public / edit deployment split: `LOOKMD_READ_ONLY` / `--read-only` leaves the
+  write endpoints unregistered. The Tailscale gating itself is a deployment
+  step, not code.
+- File System Access source: edit a local folder from a statically hosted build.
+- Separate workspaces per browser tab (`?ws=` in the URL, sessions stored per
+  workspace).
 
 ## Notes
 
