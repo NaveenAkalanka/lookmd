@@ -172,7 +172,20 @@ the editor behaves identically either way:
 > security boundary, not a lookmd limitation. Use local-folder mode to edit
 > *local* files from a hosted build; use REST mode for files that live *on the
 > server*. File System Access needs a secure context (HTTPS or `localhost`) and
-> is unavailable on Firefox and Safari.
+> is unavailable on Firefox, Safari, and mobile browsers.
+
+### Platform support
+
+- **Server:** Windows, macOS, and Linux (Node 22.18+), or the Docker image.
+  On Windows, names Windows can't store (`: * ? " < > |`, `CON`, `NUL`, a
+  trailing dot or space) are refused rather than written as hidden streams.
+- **Desktop Chrome / Edge / Brave / Opera** (Windows, macOS, Linux): the picker
+  opens a local folder via File System Access.
+- **Firefox, Safari, Android, iPhone/iPad:** these browsers lack File System
+  Access, so the picker offers **Browse the server** instead whenever a lookmd
+  server is reachable. A purely static hosted build (no server) shows a clear
+  "unsupported browser" message.
+- Layout adapts down to 320px-wide phones, with touch-sized controls.
 
 ## Project layout
 

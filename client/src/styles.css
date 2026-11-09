@@ -3014,6 +3014,9 @@ body.resizing-col .sidebar {
   gap: 8px;
   margin-bottom: 10px;
 }
+.picker-hint + .picker-breadcrumb {
+  margin-top: 14px;
+}
 .picker-breadcrumb code {
   flex: 1;
   font-family: var(--font-mono);

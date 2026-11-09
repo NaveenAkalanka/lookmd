@@ -1,20 +1,21 @@
 /**
- * Welcome / empty state. Two ways in:
+ * Welcome / empty state. Ways in:
  *  - open a local folder directly via the File System Access API (no server);
- *  - reopen a recent workspace (a remembered local folder, or a legacy server
- *    path).
+ *  - reopen a recent workspace (a remembered local folder, or a server path).
  *
  * lookmd opens files from the viewer's own machine, so the File System Access
- * API is the way in — which means a Chromium browser (Chrome, Edge, Brave,
- * Opera). Where the API is missing we say so plainly instead of offering a
+ * API is the main way in — a desktop Chromium browser (Chrome, Edge, Brave,
+ * Opera). Browsers without it (Android and iOS browsers, Firefox, Safari) fall back to
+ * browsing the lookmd server's folders when a server answers; on a purely
+ * static host there is no server, and we say so plainly instead of offering a
  * dead control.
  *
  * The picker builds the matching FileSource and hands it to `onOpen`, so the app
  * shell stays agnostic about where a workspace's bytes come from.
  */
 
-import { useCallback, useState } from 'react';
-import { ApiRequestError } from '../api';
+import { useCallback, useEffect, useState } from 'react';
+import { api, ApiRequestError } from '../api';
 import { createRestSource } from '../sources/rest';
 import {
   createFsaSource,
@@ -32,6 +33,7 @@ import {
   type RecentWorkspace,
 } from '../storage';
 import { Icon } from './Icon';
+import { ServerBrowser } from './ServerBrowser';
 import { Logo } from './Logo';
 import { BrandIcon } from './BrandIcon';
 import { ComputerIcon, Cancel01Icon } from '@hugeicons/core-free-icons';
@@ -43,6 +45,26 @@ interface Props {
 export function WorkspacePicker({ onOpen }: Props) {
   const [recents, setRecents] = useState<RecentWorkspace[]>(() => getRecents());
   const [error, setError] = useState<string | null>(null);
+  // Without File System Access, is there a lookmd server to browse instead?
+  // null while checking.
+  const [server, setServer] = useState<boolean | null>(fsaSupported ? false : null);
+
+  useEffect(() => {
+    if (fsaSupported) return;
+    let active = true;
+    api.folders('').then(
+      () => active && setServer(true),
+      () => active && setServer(false),
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const openServerFolder = useCallback(
+    (root: string, name: string) => onOpen({ kind: 'rest', root, name }, createRestSource(root)),
+    [onOpen],
+  );
 
   // Forget one recent. For a local folder also drop its IndexedDB handle, so
   // "remove" really removes the grant, not just the label.
@@ -107,7 +129,9 @@ export function WorkspacePicker({ onOpen }: Props) {
           <Logo className="picker-logo" height={34} title="lookmd" />
         </div>
         <p className="picker-subtitle">
-          Open a folder on this device to start reading and editing Markdown.
+          {server
+            ? 'Open a folder to start reading and editing Markdown.'
+            : 'Open a folder on this device to start reading and editing Markdown.'}
         </p>
 
         {error && <p className="error">{error}</p>}
@@ -124,13 +148,25 @@ export function WorkspacePicker({ onOpen }: Props) {
               re-pick it each time.
             </p>
           </section>
+        ) : server === null ? (
+          <p className="muted">Checking for a lookmd server…</p>
+        ) : server ? (
+          <section className="picker-section">
+            <h2 className="picker-heading">Browse the server</h2>
+            <p className="picker-hint muted">
+              This browser can't open folders on your device, so pick a folder from
+              the lookmd server instead.
+            </p>
+            <ServerBrowser onOpen={openServerFolder} />
+          </section>
         ) : (
           <section className="picker-section">
             <h2 className="picker-heading">Unsupported browser</h2>
             <p className="picker-hint muted">
-              lookmd opens folders from your own device using the File System
-              Access API, which this browser doesn't support. Please use a
-              Chromium-based browser — Chrome, Edge, Brave, or Opera.
+              This browser can't open folders on your device (that needs the File
+              System Access API), and no lookmd server is reachable from this page.
+              Open lookmd in desktop Chrome, Edge, Brave, or Opera, or use a copy of
+              lookmd running its server.
             </p>
           </section>
         )}
