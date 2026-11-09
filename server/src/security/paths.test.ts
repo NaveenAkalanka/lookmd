@@ -15,6 +15,7 @@ import {
   toPosix,
   PathValidationError,
   ALLOWED_EXTENSIONS,
+  windowsNameProblem,
 } from './paths.ts';
 
 /** Assert that `fn` throws a PathValidationError with the given code. */
@@ -248,5 +249,41 @@ describe('validateFileTarget (composed, lexical only)', () => {
 
   it('rejects an escaping target before checking type', () => {
     throwsCode(() => validateFileTarget({ base: BASE, root: 'ws', relPath: '../x.md' }, false), 'OUTSIDE_ROOT');
+  });
+});
+
+describe('windowsNameProblem', () => {
+  it('accepts ordinary names', () => {
+    for (const n of ['notes.md', 'My Notes (draft).md', 'été.md', 'a.b.c.md', '.hidden', 'CONSOLE.md', 'nul-ish.md']) {
+      assert.equal(windowsNameProblem(n), null, n);
+    }
+  });
+
+  it('rejects characters Windows cannot store (incl. ":" alternate data streams)', () => {
+    for (const n of ['a:b.md', 'what?.md', 'a*b.md', 'say "hi".md', 'a<b>.md', 'a|b.md', 'tab\there.md']) {
+      assert.notEqual(windowsNameProblem(n), null, n);
+    }
+  });
+
+  it('rejects reserved device names, with or without an extension', () => {
+    for (const n of ['CON', 'con.md', 'NUL.txt', 'aux.md', 'PRN', 'com1.md', 'LPT9.md', 'COM¹.md']) {
+      assert.notEqual(windowsNameProblem(n), null, n);
+    }
+  });
+
+  it('rejects trailing dots and spaces', () => {
+    assert.notEqual(windowsNameProblem('notes.md.'), null);
+    assert.notEqual(windowsNameProblem('notes.md '), null);
+    assert.notEqual(windowsNameProblem('folder.'), null);
+  });
+
+  it('is enforced by resolveInRoot only on Windows', () => {
+    const opts = { base: process.cwd(), root: '', relPath: 'sub/a:b.md' };
+    if (process.platform === 'win32') {
+      assert.throws(() => resolveInRoot(opts), (e: unknown) => e instanceof PathValidationError && e.code === 'INVALID_PATH');
+      assert.throws(() => resolveInRoot({ ...opts, relPath: '', root: 'con' }), PathValidationError);
+    } else {
+      assert.doesNotThrow(() => resolveInRoot(opts));
+    }
   });
 });

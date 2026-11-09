@@ -85,6 +85,39 @@ function assertValidWirePath(rel: string, label: string): void {
       `${label} must not contain a drive letter`,
     );
   }
+  if (process.platform === 'win32') assertWindowsSafe(rel, label);
+}
+
+// --- Windows file names -----------------------------------------------------
+
+/** Device names Windows reserves in every folder, with or without an extension
+ *  (`con.md` is still the console). Includes the superscript-digit ports. */
+const WIN_RESERVED = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(\.|$)/i;
+// eslint-disable-next-line no-control-regex
+const WIN_BAD_CHARS = /[<>:"|?*\x00-\x1f]/;
+
+/**
+ * Why Windows can't store this single path segment as a normal file, or null.
+ * `:` matters most: `notes:x.md` would silently become a hidden NTFS alternate
+ * data stream on the file `notes`. Trailing dots/spaces are stripped by Win32,
+ * so `a.md.` would land on `a.md`.
+ */
+export function windowsNameProblem(segment: string): string | null {
+  if (WIN_BAD_CHARS.test(segment)) return 'contains a character Windows does not allow (< > : " | ? *)';
+  if (WIN_RESERVED.test(segment)) return 'is a name Windows reserves for devices';
+  if (/[. ]$/.test(segment) && segment !== '.' && segment !== '..') {
+    return 'ends with a dot or space, which Windows drops';
+  }
+  return null;
+}
+
+function assertWindowsSafe(rel: string, label: string): void {
+  for (const seg of rel.split('/')) {
+    const problem = windowsNameProblem(seg);
+    if (problem) {
+      throw new PathValidationError('INVALID_PATH', `${label} "${seg}" ${problem}`);
+    }
+  }
 }
 
 // --- Containment ------------------------------------------------------------
