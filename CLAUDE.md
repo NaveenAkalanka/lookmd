@@ -96,8 +96,12 @@ Not "later." These go into the first file-touching commit.
 
 ## File handling
 
-- **Three modes per file**: Read (rendered), Source (raw, read-only),
-  Edit (raw, editable). One segmented toggle switches between them.
+- **Views + an Edit toggle**: a segmented toggle picks the view — Read
+  (rendered), Source (raw), Split (raw | rendered). A separate **Edit** toggle
+  makes the *current* view editable (Source + Edit = raw editor; Read + Edit =
+  live editing, currently the split until live preview lands). Edit off is
+  view-only. Non-Markdown text files get Source only; a read-only build hides
+  Edit entirely.
 - **Explicit save** (Ctrl/Cmd-S or a button) — never autosave. Use the hash/`409`
   check so external edits (Obsidian, git) are never silently overwritten; on `409`,
   warn the user.

@@ -77,6 +77,9 @@ async function sendJson<T>(method: string, url: string, body: unknown): Promise<
 const q = encodeURIComponent;
 
 export const api = {
+  /** Server status; `allowWrite` is false in a read-only (view-only) build. */
+  health: (): Promise<{ ok: boolean; allowWrite: boolean }> => getJson('/api/health'),
+
   folders: (path = ''): Promise<ListFoldersResponse> =>
     getJson(`/api/folders?path=${q(path)}`),
 

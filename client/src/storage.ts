@@ -148,13 +148,15 @@ function sessionKey(kind: SourceKind, root: string): string {
 }
 
 /** A workspace's editing session to restore: its open tabs, the active one,
- *  and the view mode. */
+ *  the view mode, and whether Edit was on. Records from before the Edit toggle
+ *  have no `edit` and may carry the old `mode: 'edit'` (raw editor). */
 export interface Session {
   kind: SourceKind;
   root: string;
   openPaths: string[];
   activePath: string | null;
   mode: string;
+  edit?: boolean;
 }
 
 function validSession(s: Session | null): Session | null {

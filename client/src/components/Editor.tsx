@@ -1,5 +1,6 @@
 /**
- * Edit mode: a thin CodeMirror 6 integration.
+ * The Markdown editor (Source with Edit on, and the editing side of Split): a
+ * thin CodeMirror 6 integration.
  *
  * The view is created once and kept across renders; we only push new content
  * when the *file identity* (`docKey`) changes, so typing never tears down the
@@ -23,6 +24,8 @@ import { undo, redo } from '@codemirror/commands';
 import { openSearchPanel } from '@codemirror/search';
 import { tags as t } from '@lezer/highlight';
 import type { EditorApi } from '../editorApi';
+import { detectEol, toFileText, type Eol } from '../markdown/eol';
+import { formatCommand, type FormatId } from '../markdown/format';
 
 interface Props {
   /** Current buffer contents (the draft). */
@@ -40,6 +43,8 @@ interface Props {
   onReleaseApi?: (api: EditorApi) => void;
   /** Bump `nonce` to scroll/select a 1-based line (e.g. from Find-in-Files). */
   reveal?: { line: number; nonce: number };
+  /** This editor's command API on mount, null on unmount (for its pane's toolbar). */
+  onApi?: (api: EditorApi | null) => void;
 }
 
 /** A CodeMirror theme whose every value points at a lookmd CSS variable. */
@@ -179,20 +184,6 @@ const lookmdHighlightStyle = HighlightStyle.define([
   { tag: t.invalid, color: 'var(--danger)' },
 ]);
 
-type Eol = '\r\n' | '\n';
-
-/** The line ending a file predominantly uses (LF on a tie or no breaks). */
-export function detectEol(text: string): Eol {
-  const crlf = text.match(/\r\n/g)?.length ?? 0;
-  const lf = (text.match(/\n/g)?.length ?? 0) - crlf;
-  return crlf > lf ? '\r\n' : '\n';
-}
-
-/** Turn CodeMirror's `\n`-joined document back into the file's line ending. */
-export function toFileText(docText: string, eol: Eol): string {
-  return eol === '\n' ? docText : docText.replace(/\n/g, '\r\n');
-}
-
 /** Marks the programmatic document swap on file switch, which is a load, not
  *  an edit — it must not be reported as a draft change. */
 const documentLoad = Annotation.define<boolean>();
@@ -206,6 +197,7 @@ export function Editor({
   onFocusApi,
   onReleaseApi,
   reveal,
+  onApi,
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -220,6 +212,8 @@ export function Editor({
   onSaveRef.current = onSave;
   valueRef.current = value;
   onFocusApiRef.current = onFocusApi;
+  const onApiRef = useRef(onApi);
+  onApiRef.current = onApi;
   // Line ending of the loaded file; reset whenever a new document is loaded.
   const eolRef = useRef<Eol>(detectEol(value));
 
@@ -268,6 +262,13 @@ export function Editor({
         openSearchPanel(view);
       }),
       focus: withView((view) => view.focus()),
+      format: (id: FormatId) => {
+        const view = viewRef.current;
+        if (!view) return;
+        const spec = formatCommand(id, view.state);
+        if (spec) view.dispatch(spec);
+        view.focus();
+      },
     };
   }
 
@@ -275,6 +276,17 @@ export function Editor({
   useEffect(() => {
     if (!hostRef.current) return;
 
+    // Highest precedence so these win over basicSetup (whose Mod-i selects the
+    // parent syntax node). Handled keys are preventDefault-ed, which the app's
+    // window-level shortcuts (Ctrl/Cmd-B = sidebar) check and then skip.
+    const formatKey = (key: string, id: FormatId) => ({
+      key,
+      preventDefault: true,
+      run: () => {
+        apiRef.current?.format(id);
+        return true;
+      },
+    });
     const saveKeymap = Prec.highest(
       keymap.of([
         {
@@ -285,6 +297,9 @@ export function Editor({
             return true;
           },
         },
+        formatKey('Mod-b', 'bold'),
+        formatKey('Mod-i', 'italic'),
+        formatKey('Mod-k', 'link'),
       ]),
     );
 
@@ -315,28 +330,15 @@ export function Editor({
     viewRef.current = view;
     // Register immediately so the menu works even before the first click.
     if (apiRef.current) onFocusApiRef.current?.(apiRef.current);
+    onApiRef.current?.(apiRef.current);
 
     return () => {
+      onApiRef.current?.(null);
       if (apiRef.current) onReleaseApi?.(apiRef.current);
       view.destroy();
       viewRef.current = null;
     };
   }, [onReleaseApi]);
-
-  // Scroll to and select a line on demand (Find-in-Files result navigation).
-  const lastReveal = useRef(0);
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view || !reveal || reveal.nonce === lastReveal.current) return;
-    lastReveal.current = reveal.nonce;
-    const lineNo = Math.min(Math.max(1, reveal.line), view.state.doc.lines);
-    const line = view.state.doc.line(lineNo);
-    view.dispatch({
-      selection: { anchor: line.from, head: line.to },
-      scrollIntoView: true,
-    });
-    view.focus();
-  }, [reveal]);
 
   // Replace the document when a different file is opened. We compare identity
   // (docKey), not content, so a save that returns the same text won't reset the
@@ -353,6 +355,23 @@ export function Editor({
       annotations: documentLoad.of(true),
     });
   }, [docKey, value]);
+
+  // Scroll to and select a line on demand (Find-in-Files result navigation).
+  // Declared after the document swap above so that, when a result opens a
+  // different file, the new document is loaded before its line is selected.
+  const lastReveal = useRef(0);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || !reveal || reveal.nonce === lastReveal.current) return;
+    lastReveal.current = reveal.nonce;
+    const lineNo = Math.min(Math.max(1, reveal.line), view.state.doc.lines);
+    const line = view.state.doc.line(lineNo);
+    view.dispatch({
+      selection: { anchor: line.from, head: line.to },
+      scrollIntoView: true,
+    });
+    view.focus();
+  }, [reveal]);
 
   // basicSetup always renders the gutter; hide it with a class when disabled,
   // so toggling never tears down the editor or resets the cursor.

@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TreeNode } from '@lookmd/shared';
-import { ApiRequestError } from './api';
+import { api, ApiRequestError } from './api';
 import { createRestSource } from './sources/rest';
 import type { FileSource } from './sources/types';
 import {
@@ -132,7 +132,15 @@ function isExternalUrl(src: string): boolean {
 }
 
 function isViewMode(m: string): m is ViewMode {
-  return m === 'read' || m === 'source' || m === 'edit' || m === 'split';
+  return m === 'read' || m === 'source' || m === 'split';
+}
+
+/** A saved session's view + Edit state. The old `edit` view was the raw editor,
+ *  which is now Source with Edit on. */
+function sessionView(s: Session | null): { mode: ViewMode; edit: boolean } {
+  if (!s) return { mode: 'read', edit: false };
+  if (s.mode === 'edit') return { mode: 'source', edit: true };
+  return { mode: isViewMode(s.mode) ? s.mode : 'read', edit: s.edit === true };
 }
 
 /** Append a default extension (so the name passes the text allowlist) unless the
@@ -194,9 +202,10 @@ export function App() {
     return a && openPaths.includes(a) ? a : (openPaths[0] ?? null);
   });
 
-  const [mode, setMode] = useState<ViewMode>(() =>
-    boot.session && isViewMode(boot.session.mode) ? boot.session.mode : 'read',
-  );
+  const [mode, setMode] = useState<ViewMode>(() => sessionView(boot.session).mode);
+  // Edit toggle per pane: makes the current view editable (see FilePane).
+  const [editing, setEditing] = useState<boolean>(() => sessionView(boot.session).edit);
+  const [secondaryEditing, setSecondaryEditing] = useState(false);
 
   // Multi-file split: an optional second pane bound to another open tab, laid
   // out beside ('row') or below ('column') the primary one, with its own mode.
@@ -299,7 +308,9 @@ export function App() {
       setActivePath(
         s.activePath && s.openPaths.includes(s.activePath) ? s.activePath : s.openPaths[0]!,
       );
-      if (isViewMode(s.mode)) setMode(s.mode);
+      const v = sessionView(s);
+      setMode(v.mode);
+      setEditing(v.edit);
       s.openPaths.forEach((p) => fetchInto(src, p));
     },
     [fetchInto],
@@ -586,8 +597,27 @@ export function App() {
       openPaths: openPathsKey ? openPathsKey.split('\n') : [],
       activePath,
       mode,
+      edit: editing,
     });
-  }, [workspace, openPathsKey, activePath, mode]);
+  }, [workspace, openPathsKey, activePath, mode, editing]);
+
+  // Can files be written? False only on a read-only server build; a local
+  // folder (File System Access) is always writable once granted.
+  const [canWrite, setCanWrite] = useState(true);
+  useEffect(() => {
+    if (!source || source.kind !== 'rest') {
+      setCanWrite(true);
+      return;
+    }
+    let active = true;
+    api.health().then(
+      (h) => active && setCanWrite(h.allowWrite !== false),
+      () => active && setCanWrite(true),
+    );
+    return () => {
+      active = false;
+    };
+  }, [source]);
 
   const switchWorkspace = useCallback(
     (ws: Workspace | null, src: FileSource | null = null) => {
@@ -595,6 +625,7 @@ export function App() {
       setTabs([]);
       setActivePath(null);
       setMode('read');
+      setEditing(false);
       if (ws && src) {
         setWorkspace(ws);
         setSource(src);
@@ -699,7 +730,9 @@ export function App() {
   // Ctrl/Cmd-B toggles the sidebar (collapse in pinned mode, peek in auto-hide).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+      // Inside the editor Ctrl/Cmd-B is Bold; the editor marks it handled.
+      if (e.defaultPrevented) return;
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'b') {
         e.preventDefault();
         toggleSidebar();
       }
@@ -707,6 +740,19 @@ export function App() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [toggleSidebar]);
+
+  // Ctrl/Cmd-E toggles Edit on the focused pane.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'e') return;
+      if (!canWrite || !activePath) return;
+      e.preventDefault();
+      if (focusedPane === 'secondary' && secondaryPath) setSecondaryEditing((on) => !on);
+      else setEditing((on) => !on);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [canWrite, activePath, focusedPane, secondaryPath]);
 
   // Ctrl/Cmd-P opens the quick-open palette (overriding the browser print dialog).
   useEffect(() => {
@@ -966,10 +1012,12 @@ export function App() {
   const openFromSearch = useCallback(
     (path: string, line: number) => {
       openFile(path);
-      setMode('edit');
+      // Land in the raw editor at the matching line (read-only build: Source).
+      setMode('source');
+      setEditing(canWrite);
       setReveal((r) => ({ line, nonce: (r?.nonce ?? 0) + 1 }));
     },
-    [openFile],
+    [openFile, canWrite],
   );
 
   // After a Replace-in-Files run, refresh the on-disk content of any open tab
@@ -1284,6 +1332,7 @@ export function App() {
                 request={searchRequest}
                 onOpen={openFromSearch}
                 onAfterReplace={reloadCleanTabs}
+                canWrite={canWrite}
               />
             )}
           </div>
@@ -1353,6 +1402,9 @@ export function App() {
                 tab={activeTab}
                 mode={effectiveMode(activeTab.path, mode)}
                 onMode={setMode}
+                editing={editing}
+                onEditing={setEditing}
+                canWrite={canWrite}
                 lineNumbers={lineNumbers}
                 zoom={zoom}
                 onZoomIn={zoomIn}
@@ -1387,7 +1439,7 @@ export function App() {
                     </button>
                   ) : (
                     <button
-                      className="btn icon-btn"
+                      className="btn icon-btn pane-split-open"
                       title="Split: open a second file pane"
                       aria-label="Split editor"
                       onClick={enableSplit}
@@ -1402,6 +1454,9 @@ export function App() {
                   tab={secondaryTab}
                   mode={effectiveMode(secondaryTab.path, secondaryMode)}
                   onMode={setSecondaryMode}
+                  editing={secondaryEditing}
+                  onEditing={setSecondaryEditing}
+                  canWrite={canWrite}
                   lineNumbers={lineNumbers}
                   zoom={zoom}
                   onZoomIn={zoomIn}

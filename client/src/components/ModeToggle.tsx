@@ -1,15 +1,15 @@
 /**
- * The Read / Source / Edit segmented control. Pure presentation: it reports the
+ * The Read / Source / Split segmented control (what you see; the separate Edit
+ * toggle decides whether it is editable). Pure presentation: it reports the
  * chosen mode upward and reflects the active one. Layout DNA, not theme — its
  * colors still come from tokens.
  */
 
-export type ViewMode = 'read' | 'source' | 'edit' | 'split';
+export type ViewMode = 'read' | 'source' | 'split';
 
 const MODES: { id: ViewMode; label: string }[] = [
   { id: 'read', label: 'Read' },
   { id: 'source', label: 'Source' },
-  { id: 'edit', label: 'Edit' },
   { id: 'split', label: 'Split' },
 ];
 

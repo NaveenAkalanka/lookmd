@@ -1,7 +1,13 @@
 /**
- * One editor/viewer pane: a file-bar (name or file switcher + Read/Source/Edit
- * toggle + Save), the conflict/save banners, and the file body in the chosen
- * mode. The app shell renders one pane normally and two when split, each bound
+ * One editor/viewer pane: a file-bar (name or file switcher + Read/Source/Split
+ * toggle + the Edit toggle + Save), the editing toolbar while Edit is on, the
+ * conflict/save banners, and the file body in the chosen mode.
+ *
+ * Edit is a toggle on top of the view, not a view of its own: Source + Edit is
+ * the raw editor, Split + Edit puts the raw editor beside the rendered preview,
+ * and Read + Edit falls back to that split until live preview lands. Source and
+ * Split share one editor slot, so switching between them while editing keeps
+ * the same editor (cursor, undo history) mounted. The app shell renders one pane normally and two when split, each bound
  * to its own tab, so two files can be viewed/edited side by side or stacked.
  *
  * The heavy rendering/highlighting stacks (react-markdown, highlight.js,
@@ -11,7 +17,14 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { isMarkdownPath } from '@lookmd/shared';
 import { Icon } from './Icon';
-import { Cancel01Icon, MinusSignIcon, PlusSignIcon, Edit02Icon } from '@hugeicons/core-free-icons';
+import {
+  Cancel01Icon,
+  MinusSignIcon,
+  PlusSignIcon,
+  HighlighterIcon,
+  PencilEdit02Icon,
+} from '@hugeicons/core-free-icons';
+import { EditToolbar } from './EditToolbar';
 import { ModeToggle, type ViewMode } from './ModeToggle';
 import { AnnotationLayer } from './AnnotationLayer';
 import { AnnotationToolbar } from './AnnotationToolbar';
@@ -27,8 +40,8 @@ import { ZOOM_MIN, ZOOM_MAX } from '../settings';
 import { type Tab, tabDirty } from '../tab';
 import type { EditorApi } from '../editorApi';
 
-const MARKDOWN_MODES: ViewMode[] = ['read', 'source', 'edit', 'split'];
-const TEXT_MODES: ViewMode[] = ['source', 'edit'];
+const MARKDOWN_MODES: ViewMode[] = ['read', 'source', 'split'];
+const TEXT_MODES: ViewMode[] = ['source'];
 
 const ReadView = lazy(() => import('./ReadView').then((m) => ({ default: m.ReadView })));
 const SourceView = lazy(() => import('./SourceView').then((m) => ({ default: m.SourceView })));
@@ -42,6 +55,11 @@ interface Props {
   tab: Tab;
   mode: ViewMode;
   onMode: (m: ViewMode) => void;
+  /** Edit toggle: makes the current view editable. */
+  editing: boolean;
+  onEditing: (on: boolean) => void;
+  /** Whether this file can be saved at all (false in a read-only build). */
+  canWrite: boolean;
   lineNumbers: boolean;
   /** Content zoom multiplier and its steppers (global; same value in every pane). */
   zoom: number;
@@ -76,6 +94,9 @@ export function FilePane({
   tab,
   mode,
   onMode,
+  editing,
+  onEditing,
+  canWrite,
   lineNumbers,
   zoom,
   onZoomIn,
@@ -112,9 +133,17 @@ export function FilePane({
 
   const viewRef = useRef<HTMLDivElement | null>(null);
   const [scrollHost, setScrollHost] = useState<HTMLElement | null>(null);
+  // The mounted editor's command API, for this pane's toolbar.
+  const [paneApi, setPaneApi] = useState<EditorApi | null>(null);
 
-  // The overlay is offered on Read/Source/Edit (not the split combo view).
-  const annotatable = mode === 'read' || mode === 'source' || mode === 'edit';
+  // What actually renders. Read + Edit shows the split (editor | preview)
+  // until live preview inside Read exists.
+  const editOn = editing && canWrite;
+  const shown: ViewMode = editOn && mode === 'read' ? 'split' : mode;
+  const editorShown = editOn && (shown === 'source' || shown === 'split');
+
+  // The overlay is offered on the single-column views (not a split).
+  const annotatable = shown === 'read' || shown === 'source';
   const overlayOn = annotateOn && annotatable;
 
   // Switching tool away from Select, changing file, or closing the overlay drops
@@ -211,25 +240,25 @@ export function FilePane({
       const view = viewRef.current;
       if (!view) return;
       const host: HTMLElement | null =
-        mode === 'source'
-          ? view.querySelector('.source-wrap')
-          : mode === 'edit'
+        shown !== 'source'
+          ? view
+          : editorShown
             ? view.querySelector('.cm-scroller')
-            : view;
+            : (view.querySelector('.source-wrap') ?? view.querySelector('.split-pane'));
       if (host) setScrollHost(host);
       else if (tries++ < 60) raf = requestAnimationFrame(find);
     };
     find();
     return () => cancelAnimationFrame(raf);
-  }, [overlayOn, mode, tab.path, tab.loading]);
+  }, [overlayOn, shown, editorShown, tab.path, tab.loading]);
 
   // Entering annotate mode in the editor: drop keyboard focus so typing is locked
   // (the overlay already blocks the mouse). Editing resumes when toggled off.
   useEffect(() => {
-    if (overlayOn && mode === 'edit') {
+    if (overlayOn && editorShown) {
       (document.activeElement as HTMLElement | null)?.blur?.();
     }
-  }, [overlayOn, mode]);
+  }, [overlayOn, editorShown]);
 
   const toggleAnnotate = () => setAnnotateOn((on) => !on);
 
@@ -263,6 +292,17 @@ export function FilePane({
           </span>
         )}
         <ModeToggle mode={mode} onChange={onMode} available={available} />
+        {canWrite && (
+          <button
+            className={`btn edit-toggle${editOn ? ' edit-toggle-on' : ''}`}
+            title={editOn ? 'Stop editing (Ctrl/Cmd-E)' : 'Edit this file (Ctrl/Cmd-E)'}
+            aria-pressed={editOn}
+            onClick={() => onEditing(!editOn)}
+          >
+            <Icon icon={PencilEdit02Icon} size={15} />
+            <span className="btn-label">Edit</span>
+          </button>
+        )}
         <div className="zoom-control" role="group" aria-label="Zoom">
           <button
             onClick={onZoomOut}
@@ -297,12 +337,14 @@ export function FilePane({
             aria-pressed={annotateOn}
             onClick={toggleAnnotate}
           >
-            <Icon icon={Edit02Icon} size={15} />
+            <Icon icon={HighlighterIcon} size={15} />
           </button>
         )}
-        <button className="btn btn-accent" onClick={onSave} disabled={!dirty || tab.saving}>
-          {tab.saving ? 'Saving…' : 'Save'}
-        </button>
+        {canWrite && (
+          <button className="btn btn-accent" onClick={onSave} disabled={!dirty || tab.saving}>
+            {tab.saving ? 'Saving…' : 'Save'}
+          </button>
+        )}
         {controls}
         {onClose && (
           <button
@@ -315,6 +357,8 @@ export function FilePane({
           </button>
         )}
       </div>
+
+      {editorShown && <EditToolbar api={paneApi} />}
 
       {tab.conflict && (
         <div className="banner banner-warn">
@@ -333,45 +377,39 @@ export function FilePane({
       )}
       {tab.saveError && <div className="banner banner-error">{tab.saveError}</div>}
 
-      <div className={`pane-body${overlayOn ? ' annotate-active' : ''}${overlayOn && mode === 'edit' ? ' annotate-locked' : ''}`}>
+      <div className={`pane-body${overlayOn ? ' annotate-active' : ''}${overlayOn && editorShown ? ' annotate-locked' : ''}`}>
       <div className="view" ref={viewRef}>
         {tab.loading && <div className="placeholder">Loading {tab.path}…</div>}
         {tab.error && <div className="placeholder error">{tab.error}</div>}
         {tab.content !== null && !tab.loading && !tab.error && (
           <Suspense fallback={<div className="placeholder">Loading…</div>}>
-            {mode === 'read' && (
+            {shown === 'read' && (
               <ReadView content={tab.draft} resolveImage={resolveImage} onNavigate={onNavigate} />
             )}
-            {mode === 'source' && <SourceView content={tab.draft} lineNumbers={lineNumbers} />}
-            {mode === 'edit' && (
-              <Editor
-                value={tab.draft}
-                docKey={docKey}
-                onChange={onChangeDraft}
-                onSave={onSave}
-                lineNumbers={lineNumbers}
-                onFocusApi={onEditorFocusApi}
-                onReleaseApi={onEditorReleaseApi}
-                reveal={reveal}
-              />
-            )}
-            {mode === 'split' && (
-              <div className="split">
+            {(shown === 'source' || shown === 'split') && (
+              <div className={`split${shown === 'split' ? '' : ' split-single'}`}>
                 <div className="split-pane split-editor">
-                  <Editor
-                    value={tab.draft}
-                    docKey={docKey}
-                    onChange={onChangeDraft}
-                    onSave={onSave}
-                    lineNumbers={lineNumbers}
-                    onFocusApi={onEditorFocusApi}
-                    onReleaseApi={onEditorReleaseApi}
-                    reveal={reveal}
-                  />
+                  {editorShown ? (
+                    <Editor
+                      value={tab.draft}
+                      docKey={docKey}
+                      onChange={onChangeDraft}
+                      onSave={onSave}
+                      lineNumbers={lineNumbers}
+                      onFocusApi={onEditorFocusApi}
+                      onReleaseApi={onEditorReleaseApi}
+                      reveal={reveal}
+                      onApi={setPaneApi}
+                    />
+                  ) : (
+                    <SourceView content={tab.draft} lineNumbers={lineNumbers} />
+                  )}
                 </div>
-                <div className="split-pane split-preview">
-                  <ReadView content={tab.draft} resolveImage={resolveImage} onNavigate={onNavigate} />
-                </div>
+                {shown === 'split' && (
+                  <div className="split-pane split-preview">
+                    <ReadView content={tab.draft} resolveImage={resolveImage} onNavigate={onNavigate} />
+                  </div>
+                )}
               </div>
             )}
           </Suspense>
@@ -410,7 +448,7 @@ export function FilePane({
               onSelect={selectMark}
               onUpdate={annot.updateMark}
             />
-            {mode === 'edit' && (
+            {editorShown && (
               <span className="annotate-pill">Editing locked while annotating</span>
             )}
           </>

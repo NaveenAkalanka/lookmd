@@ -4,6 +4,8 @@
  * app shell importing CodeMirror. The Editor builds one of these and reports it
  * on focus; the menu calls into whichever editor last had focus.
  */
+import type { FormatId } from './markdown/format';
+
 export interface EditorApi {
   undo(): void;
   redo(): void;
@@ -14,4 +16,6 @@ export interface EditorApi {
   find(): void;
   replace(): void;
   focus(): void;
+  /** Apply a Markdown formatting command (toolbar / shortcuts) to the selection. */
+  format(id: FormatId): void;
 }
