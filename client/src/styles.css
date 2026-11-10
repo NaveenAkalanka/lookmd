@@ -1155,7 +1155,6 @@ body {
 .palette-backdrop   { animation: fade-in  0.16s var(--ease-out) both; }
 .palette            { animation: scale-in 0.22s var(--ease-spring) both; }
 .context-menu       { animation: scale-in 0.14s var(--ease-out) both; transform-origin: top left; }
-.search-window      { animation: scale-in 0.22s var(--ease-spring) both; }
 .sidebar-backdrop   { animation: fade-in  0.16s var(--ease-out) both; }
 
 /* Dropdowns / popovers */
@@ -1433,20 +1432,20 @@ body.resizing-col .sidebar {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
+  left: var(--activitybar-width);
   z-index: 20;
   transform: translateX(0);
   box-shadow: 2px 0 14px rgba(0, 0, 0, 0.22);
 }
 .body-autohide.sidebar-hidden .sidebar {
-  transform: translateX(-100%);
+  transform: translateX(calc(-100% - var(--activitybar-width)));
   box-shadow: none;
 }
 .sidebar-reveal {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0;
+  left: var(--activitybar-width);
   width: 14px;
   z-index: 15;
   cursor: pointer;
@@ -1684,16 +1683,7 @@ body.resizing-col .sidebar {
 /* --- File bar (name + mode toggle + save) -------------------------------- */
 /* --- Outline (active file's headings) ------------------------------------ */
 .outline {
-  border-top: 1px solid var(--border);
-  margin-top: 6px;
-  padding: 8px 0;
-}
-.outline-head {
-  padding: 4px 12px 6px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-tertiary);
+  padding: 2px 0 8px;
 }
 .outline-list {
   list-style: none;
@@ -2349,36 +2339,70 @@ body.resizing-col .sidebar {
   background: color-mix(in srgb, var(--brand-coffee) 88%, #fff);
 }
 
-/* --- Find / Replace in Files -------------------------------------------- */
-.search-window {
-  width: 620px;
-  max-height: 78vh;
-}
+/* --- Find / Replace in Files (sidebar Search view) ---------------------- */
 .search-controls {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  padding: 8px 10px 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
 }
-.search-replace {
-  width: 100%;
+.search-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  color: var(--text-tertiary);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.search-input-row:focus-within {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 1px;
+}
+.search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+}
+.search-input:focus,
+.search-input-row .search-input:focus-visible {
+  outline: none;
+}
+.search-input::placeholder {
+  color: var(--text-tertiary);
+}
+.search-input.search-replace {
+  padding: 7px 8px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.search-input.search-replace:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 1px;
+}
+.search-case {
+  font-size: 12px;
 }
 .search-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-}
-.search-actions-spacer {
-  flex: 1;
 }
 .search-status {
   margin: 0;
   font-size: 12px;
 }
 .search-results {
-  overflow: auto;
-  padding: 6px 8px 12px;
+  padding: 4px 4px 12px;
 }
 .search-file {
   margin-top: 8px;
@@ -2400,19 +2424,20 @@ body.resizing-col .sidebar {
 }
 .search-file-count {
   color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
 }
 .search-hit {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
   text-align: left;
   border: none;
   background: none;
   color: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 12.5px;
-  padding: 4px 8px 4px 16px;
+  font-size: 12px;
+  padding: 4px 8px 4px 10px;
   border-radius: 6px;
   cursor: pointer;
 }
@@ -2421,9 +2446,10 @@ body.resizing-col .sidebar {
 }
 .search-hit-line {
   flex-shrink: 0;
-  min-width: 34px;
+  min-width: 28px;
   text-align: right;
   color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
 }
 .search-hit-text {
   overflow: hidden;
@@ -3324,5 +3350,76 @@ body.resizing-col .sidebar {
 @media (pointer: coarse) {
   .btn {
     min-height: 36px;
+  }
+}
+
+/* --- Activity bar (VS Code-style view switcher) -------------------------- */
+:root {
+  --activitybar-width: 48px;
+  /* A second neutral layer, a step off the sidebar surface. */
+  --activitybar-bg: color-mix(in srgb, var(--background) 55%, var(--surface));
+}
+.activitybar {
+  flex-shrink: 0;
+  width: var(--activitybar-width);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  background: var(--activitybar-bg);
+  border-right: 1px solid var(--border);
+  z-index: 21;
+}
+.activitybar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.activitybar-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.16s var(--ease-out), color 0.16s var(--ease-out);
+}
+.activitybar-item:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+.activitybar-item-active,
+.activitybar-item-active:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* Mobile: the bar and the sidebar slide in together as one drawer. */
+@media (max-width: 720px) {
+  .body-mobile .activitybar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 31;
+    transform: translateX(0);
+    transition: transform 0.18s ease;
+  }
+  .body-mobile .sidebar {
+    left: var(--activitybar-width);
+    width: min(calc(86vw - var(--activitybar-width)), 300px);
+  }
+  .body-mobile.sidebar-hidden .activitybar {
+    transform: translateX(-100%);
+  }
+  .body-mobile.sidebar-hidden .sidebar {
+    transform: translateX(calc(-100% - var(--activitybar-width)));
   }
 }

@@ -1,6 +1,6 @@
 /**
- * Find / Replace in Files: a floating window that searches every text file in
- * the workspace for a query and lists the matches by file and line. With a
+ * Find / Replace in Files: the sidebar's Search view. It searches every text
+ * file in the workspace for a query and lists the matches by file and line. With a
  * replacement it can rewrite all matches across files (hash-checked saves via
  * the active source). Clicking a result opens that file at the matching line.
  *
@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
-import { Search01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
+import { Search01Icon } from '@hugeicons/core-free-icons';
 import { ApiRequestError } from '../api';
 import type { FileSource } from '../sources/types';
 
@@ -23,14 +23,22 @@ interface FileResult {
   matches: MatchLine[];
 }
 
+/** A request from outside (shortcut / Edit menu) to focus the panel, optionally
+ *  with Replace showing. A new `nonce` re-applies it while already open. */
+export interface SearchRequest {
+  mode: 'find' | 'replace';
+  nonce: number;
+}
+
 interface Props {
   files: string[];
   source: FileSource;
-  startMode: 'find' | 'replace';
+  request: SearchRequest | null;
   onOpen: (path: string, line: number) => void;
-  onClose: () => void;
   /** Called after a Replace All writes to disk, so open tabs can refresh. */
   onAfterReplace?: () => void;
+  /** Whether writes are possible (hides Replace in a read-only build). */
+  canWrite?: boolean;
 }
 
 function escapeRe(s: string): string {
@@ -41,27 +49,30 @@ function matches(text: string, q: string, caseSensitive: boolean): boolean {
   return caseSensitive ? text.includes(q) : text.toLowerCase().includes(q.toLowerCase());
 }
 
-export function WorkspaceSearch({ files, source, startMode, onOpen, onClose, onAfterReplace }: Props) {
+export function WorkspaceSearch({
+  files,
+  source,
+  request,
+  onOpen,
+  onAfterReplace,
+  canWrite = true,
+}: Props) {
   const [query, setQuery] = useState('');
   const [replacement, setReplacement] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
-  const [showReplace, setShowReplace] = useState(startMode === 'replace');
+  const [showReplace, setShowReplace] = useState(false);
   const [results, setResults] = useState<FileResult[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Each outside request focuses the query box (and shows Replace if asked).
   useEffect(() => {
+    if (!request) return;
+    if (request.mode === 'replace' && canWrite) setShowReplace(true);
     inputRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    inputRef.current?.select();
+  }, [request, canWrite]);
 
   const totalMatches = results?.reduce((n, r) => n + r.matches.length, 0) ?? 0;
 
@@ -125,9 +136,11 @@ export function WorkspaceSearch({ files, source, startMode, onOpen, onClose, onA
       }
     }
     setBusy(false);
-    setStatus(`Replaced in ${changed} file(s)${failed ? `, ${failed} failed` : ''}.`);
     onAfterReplace?.();
+    // Refresh the results first, then report: runSearch sets its own status
+    // ("No matches."), which would otherwise hide the replace summary.
     await runSearch();
+    setStatus(`Replaced in ${changed} file(s)${failed ? `, ${failed} failed` : ''}.`);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -138,93 +151,87 @@ export function WorkspaceSearch({ files, source, startMode, onOpen, onClose, onA
   };
 
   return (
-    <div className="settings-backdrop" onMouseDown={onClose}>
-      <div
-        className="settings-window search-window"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Find in files"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="settings-window-head">
-          <h2 className="settings-title">{showReplace ? 'Replace in Files' : 'Find in Files'}</h2>
-          <button className="btn icon-btn" aria-label="Close" onClick={onClose}>
-            <Icon icon={Cancel01Icon} size={16} />
-          </button>
+    <div className="search-panel" aria-label="Find in files">
+      <div className="search-controls">
+        <div className="search-input-row">
+          <Icon icon={Search01Icon} size={16} />
+          <input
+            ref={inputRef}
+            className="search-input"
+            placeholder="Search all files"
+            aria-label="Search all files"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onKeyDown}
+          />
         </div>
-
-        <div className="search-controls">
-          <div className="palette-input-row">
-            <Icon icon={Search01Icon} size={18} />
-            <input
-              ref={inputRef}
-              className="palette-input"
-              placeholder="Search across all files…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onKeyDown}
-            />
-          </div>
-          {showReplace && (
-            <input
-              className="setting-control search-replace"
-              placeholder="Replace with…"
-              value={replacement}
-              onChange={(e) => setReplacement(e.target.value)}
-            />
-          )}
-          <div className="search-actions">
-            <label className="setting-check">
-              <input
-                type="checkbox"
-                checked={caseSensitive}
-                onChange={(e) => setCaseSensitive(e.target.checked)}
-              />
-              Match case
-            </label>
-            <span className="search-actions-spacer" />
-            {!showReplace && (
-              <button className="btn" onClick={() => setShowReplace(true)}>
-                Replace…
-              </button>
-            )}
-            <button className="btn btn-accent" onClick={() => void runSearch()} disabled={busy || query === ''}>
-              {busy ? 'Working…' : 'Search'}
-            </button>
-            {showReplace && (
+        {showReplace && (
+          <input
+            className="search-input search-replace"
+            placeholder="Replace with"
+            aria-label="Replace with"
+            value={replacement}
+            onChange={(e) => setReplacement(e.target.value)}
+            onKeyDown={onKeyDown}
+          />
+        )}
+        <label className="setting-check search-case">
+          <input
+            type="checkbox"
+            checked={caseSensitive}
+            onChange={(e) => setCaseSensitive(e.target.checked)}
+          />
+          Match case
+        </label>
+        <div className="search-actions">
+          <button className="btn btn-accent" onClick={() => void runSearch()} disabled={busy || query === ''}>
+            {busy ? 'Working…' : 'Search'}
+          </button>
+          {canWrite &&
+            (showReplace ? (
               <button
                 className="btn"
                 onClick={() => void replaceAll()}
                 disabled={busy || !results || totalMatches === 0}
               >
-                Replace All
+                Replace all
               </button>
-            )}
-          </div>
-          {status && <p className="muted search-status">{status}</p>}
+            ) : (
+              <button className="btn" onClick={() => setShowReplace(true)}>
+                Replace…
+              </button>
+            ))}
         </div>
+        {status && (
+          <p className="muted search-status" role="status">
+            {status}
+          </p>
+        )}
+        {!results && !status && (
+          <p className="muted search-status">Press Enter to search every file in the workspace.</p>
+        )}
+      </div>
 
-        <div className="search-results">
-          {results?.map((r) => (
-            <div key={r.path} className="search-file">
-              <div className="search-file-head">
-                <span className="search-file-path">{r.path}</span>
-                <span className="search-file-count">{r.matches.length}</span>
-              </div>
-              {r.matches.map((m) => (
-                <button
-                  key={`${r.path}:${m.line}`}
-                  className="search-hit"
-                  onClick={() => onOpen(r.path, m.line)}
-                  title={`Open ${r.path} at line ${m.line}`}
-                >
-                  <span className="search-hit-line">{m.line}</span>
-                  <span className="search-hit-text">{m.text}</span>
-                </button>
-              ))}
+      <div className="search-results">
+        {results?.map((r) => (
+          <div key={r.path} className="search-file">
+            <div className="search-file-head" title={r.path}>
+              <span className="search-file-path">{r.path}</span>
+              <span className="search-file-count">{r.matches.length}</span>
             </div>
-          ))}
-        </div>
+            {r.matches.map((m) => (
+              <button
+                key={`${r.path}:${m.line}`}
+                className="search-hit"
+                onClick={() => onOpen(r.path, m.line)}
+                title={`Open ${r.path} at line ${m.line}`}
+              >
+                <span className="search-hit-line">{m.line}</span>
+                <span className="search-hit-text">{m.text}</span>
+              </button>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );

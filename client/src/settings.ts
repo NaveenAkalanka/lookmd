@@ -142,15 +142,21 @@ export const MONO_FONTS: FontOption[] = [
   { label: 'JetBrains / Fira', value: "'JetBrains Mono', 'Fira Code', monospace" },
 ];
 
+/** Which view the sidebar shows, picked from the activity bar. */
+export type SidebarView = 'files' | 'outline' | 'search';
+export const SIDEBAR_VIEWS: readonly SidebarView[] = ['files', 'outline', 'search'];
+
 export interface SidebarPref {
   /** Manual collapse state, used when not auto-hiding. */
   collapsed: boolean;
   /** When true the sidebar floats as an overlay, revealed on hover at the edge
    *  and hidden again after you open a file. */
   autoHide: boolean;
+  /** The active sidebar view. */
+  view: SidebarView;
 }
 
-export const DEFAULT_SIDEBAR: SidebarPref = { collapsed: false, autoHide: false };
+export const DEFAULT_SIDEBAR: SidebarPref = { collapsed: false, autoHide: false, view: 'files' };
 
 /** Sidebar width is drag-resizable; the value is clamped to this range. */
 export const SIDEBAR_WIDTH_MIN = 200;
@@ -204,6 +210,7 @@ export function getSidebar(): SidebarPref {
     return {
       collapsed: typeof parsed.collapsed === 'boolean' ? parsed.collapsed : false,
       autoHide: typeof parsed.autoHide === 'boolean' ? parsed.autoHide : false,
+      view: SIDEBAR_VIEWS.includes(parsed.view as SidebarView) ? (parsed.view as SidebarView) : 'files',
     };
   } catch {
     return { ...DEFAULT_SIDEBAR };

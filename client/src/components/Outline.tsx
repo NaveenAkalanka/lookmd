@@ -33,18 +33,23 @@ function extractHeadings(md: string): Heading[] {
 }
 
 interface Props {
-  content: string;
+  /** The active file's text, or null when no file (or a non-Markdown file) is open. */
+  content: string | null;
   onJump: (slug: string) => void;
 }
 
 export function Outline({ content, onJump }: Props) {
-  const headings = useMemo(() => extractHeadings(content), [content]);
-  if (headings.length === 0) return null;
+  const headings = useMemo(() => (content === null ? [] : extractHeadings(content)), [content]);
+  if (content === null) {
+    return <p className="muted sidebar-empty">Open a Markdown file to see its outline.</p>;
+  }
+  if (headings.length === 0) {
+    return <p className="muted sidebar-empty">No headings in this file.</p>;
+  }
   const minLevel = Math.min(...headings.map((h) => h.level));
 
   return (
     <nav className="outline" aria-label="Outline">
-      <div className="outline-head">Outline</div>
       <ul className="outline-list">
         {headings.map((h, i) => (
           <li key={`${h.slug}-${i}`}>

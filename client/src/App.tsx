@@ -53,13 +53,15 @@ import {
 } from '@hugeicons/core-free-icons';
 import { FilePane } from './components/FilePane';
 import { EditMenu } from './components/EditMenu';
-import { WorkspaceSearch } from './components/WorkspaceSearch';
+import { WorkspaceSearch, type SearchRequest } from './components/WorkspaceSearch';
+import { ActivityBar } from './components/ActivityBar';
 import { ContextMenu, type ContextMenuState, type MenuEntry } from './components/ContextMenu';
 import { type Tab, newTab, tabDirty } from './tab';
 import type { EditorApi } from './editorApi';
 import { type ViewMode } from './components/ModeToggle';
 import { SettingsPanel } from './components/SettingsPanel';
 import {
+  type SidebarView,
   getTheme,
   getFonts,
   getSidebar,
@@ -205,10 +207,10 @@ export function App() {
   const [focusedPane, setFocusedPane] = useState<'primary' | 'secondary'>('primary');
 
   // Edit menu: the command API of the focused editor (null when none is focused),
-  // the open Find/Replace-in-Files panel, and a "reveal this line" pulse for the
-  // primary editor (set when opening a search result).
+  // the latest request to focus the sidebar's Find/Replace-in-Files view, and a
+  // "reveal this line" pulse for the primary editor (set when opening a result).
   const [editApi, setEditApi] = useState<EditorApi | null>(null);
-  const [searchMode, setSearchMode] = useState<'find' | 'replace' | null>(null);
+  const [searchRequest, setSearchRequest] = useState<SearchRequest | null>(null);
   const [reveal, setReveal] = useState<{ line: number; nonce: number } | undefined>(undefined);
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
 
@@ -374,6 +376,38 @@ export function App() {
     else if (sidebar.autoHide) setPeek((p) => !p);
     else changeSidebar({ ...sidebar, collapsed: !sidebar.collapsed });
   }, [isMobile, sidebar, changeSidebar]);
+
+  // Show a sidebar view, opening the sidebar if it's hidden (drawer on mobile,
+  // peek in auto-hide, un-collapse when pinned).
+  const showSidebarView = useCallback(
+    (view: SidebarView) => {
+      const pinned = !isMobile && !sidebar.autoHide;
+      if (sidebar.view !== view || (pinned && sidebar.collapsed)) {
+        changeSidebar({ ...sidebar, view, collapsed: pinned ? false : sidebar.collapsed });
+      }
+      if (isMobile) setDrawerOpen(true);
+      else if (sidebar.autoHide) setPeek(true);
+    },
+    [isMobile, sidebar, changeSidebar],
+  );
+
+  // Activity bar click, VS Code behavior: the view that's already showing
+  // collapses the sidebar; any other view switches to it.
+  const selectSidebarView = useCallback(
+    (view: SidebarView) => {
+      if (sidebarVisible && sidebar.view === view) toggleSidebar();
+      else showSidebarView(view);
+    },
+    [sidebarVisible, sidebar.view, toggleSidebar, showSidebarView],
+  );
+
+  const openSearch = useCallback(
+    (mode: 'find' | 'replace') => {
+      showSidebarView('search');
+      setSearchRequest((r) => ({ mode, nonce: (r?.nonce ?? 0) + 1 }));
+    },
+    [showSidebarView],
+  );
 
   // Hover-intent for auto-hide: reveal instantly, but wait a grace period before
   // hiding so a brief stray movement off the panel doesn't snap it shut. Moving
@@ -711,15 +745,15 @@ export function App() {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
-        setSearchMode('find');
+        openSearch('find');
       } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'h') {
         e.preventDefault();
-        setSearchMode('replace');
+        openSearch('replace');
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [openSearch]);
 
   // Conflict resolution: discard local edits and re-read from disk.
   const discardReloadPath = useCallback(
@@ -1043,6 +1077,7 @@ export function App() {
   // (rehype-slug puts matching ids on the rendered headings).
   const jumpToHeading = useCallback((slug: string) => {
     setMode('read');
+    setDrawerOpen(false); // on mobile, get the drawer out of the way
     window.setTimeout(() => {
       document.getElementById(slug)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 60);
@@ -1106,8 +1141,8 @@ export function App() {
         </span>
         <EditMenu
           editApi={editApi}
-          onFindInFiles={() => setSearchMode('find')}
-          onReplaceInFiles={() => setSearchMode('replace')}
+          onFindInFiles={() => openSearch('find')}
+          onReplaceInFiles={() => openSearch('replace')}
         />
         <span className="workspace-name" title={workspace.root || '/'}>
           {workspace.name}
@@ -1121,7 +1156,7 @@ export function App() {
           <Icon icon={Folder01Icon} size={16} />
           <span className="btn-label">Change workspace</span>
         </button>
-        {settingsButton}
+        {isMobile && settingsButton}
       </header>
 
       <div
@@ -1129,6 +1164,25 @@ export function App() {
           sidebarVisible ? '' : ' sidebar-hidden'
         }`}
       >
+        <ActivityBar
+          view={sidebar.view}
+          open={sidebarVisible}
+          onSelect={selectSidebarView}
+          bottom={
+            isMobile ? undefined : (
+              <button
+                className={`activitybar-item${settingsOpen ? ' activitybar-item-active' : ''}`}
+                title="Appearance"
+                aria-label="Appearance settings"
+                aria-haspopup="dialog"
+                aria-expanded={settingsOpen}
+                onClick={() => setSettingsOpen((o) => !o)}
+              >
+                <Icon icon={Settings01Icon} size={22} />
+              </button>
+            )
+          }
+        />
         {!isMobile && sidebar.autoHide && !sidebarVisible && (
           <div
             className="sidebar-reveal"
@@ -1152,61 +1206,87 @@ export function App() {
             if (sidebar.autoHide) scheduleHide();
           }}
         >
-          <div className="sidebar-head">
-            <span className="sidebar-head-label">Files</span>
-            <button
-              className="tree-action"
-              title={sidebar.autoHide ? 'Pin sidebar (turn off auto-hide)' : 'Auto-hide sidebar'}
-              aria-label="Toggle sidebar auto-hide"
-              aria-pressed={sidebar.autoHide}
-              onClick={() => changeSidebar({ ...sidebar, autoHide: !sidebar.autoHide })}
-            >
-              <Icon icon={PinIcon} size={16} />
-            </button>
-            <button
-              className="tree-action"
-              title="Refresh file tree"
-              aria-label="Refresh file tree"
-              onClick={() => void loadTree()}
-            >
-              <Icon icon={RefreshIcon} size={16} />
-            </button>
-            <CreateMenu
-              dir=""
-              onNewFile={(dir, ext) => void newFile(dir, ext)}
-              onNewFolder={(dir) => void newFolder(dir)}
-              label="New in workspace root"
+          <div className="sidebar-view" hidden={sidebar.view !== 'files'}>
+            <div className="sidebar-head">
+              <span className="sidebar-head-label">Files</span>
+              <button
+                className="tree-action"
+                title={sidebar.autoHide ? 'Pin sidebar (turn off auto-hide)' : 'Auto-hide sidebar'}
+                aria-label="Toggle sidebar auto-hide"
+                aria-pressed={sidebar.autoHide}
+                onClick={() => changeSidebar({ ...sidebar, autoHide: !sidebar.autoHide })}
+              >
+                <Icon icon={PinIcon} size={16} />
+              </button>
+              <button
+                className="tree-action"
+                title="Refresh file tree"
+                aria-label="Refresh file tree"
+                onClick={() => void loadTree()}
+              >
+                <Icon icon={RefreshIcon} size={16} />
+              </button>
+              <CreateMenu
+                dir=""
+                onNewFile={(dir, ext) => void newFile(dir, ext)}
+                onNewFolder={(dir) => void newFolder(dir)}
+                label="New in workspace root"
+              />
+            </div>
+            {actionError && (
+              <p className="error sidebar-empty sidebar-action-error" onClick={() => setActionError(null)}>
+                {actionError} <span className="muted">(dismiss)</span>
+              </p>
+            )}
+            {treeLoading && (
+              <div aria-busy="true" aria-label="Loading files">
+                <div className="sidebar-loading" style={{ width: '72%' }} />
+                <div className="sidebar-loading" style={{ width: '55%' }} />
+                <div className="sidebar-loading" style={{ width: '80%' }} />
+                <div className="sidebar-loading" style={{ width: '45%' }} />
+              </div>
+            )}
+            {treeError && <p className="error sidebar-empty">{treeError}</p>}
+            {!treeLoading && !treeError && (
+              <FileTree
+                tree={filteredTree}
+                activePath={activePath}
+                onOpenFile={openFile}
+                onNewFile={(dir, ext) => void newFile(dir, ext)}
+                onNewFolder={(dir) => void newFolder(dir)}
+                onContextMenu={fileTreeMenu}
+                onRename={(path) => void renameFile(path)}
+                onDelete={(path) => void deleteFile(path)}
+              />
+            )}
+          </div>
+          <div className="sidebar-view" hidden={sidebar.view !== 'outline'}>
+            <div className="sidebar-head">
+              <span className="sidebar-head-label">Outline</span>
+            </div>
+            <Outline
+              content={
+                activeTab && activeTab.content !== null && isMarkdownPath(activeTab.path)
+                  ? activeTab.draft
+                  : null
+              }
+              onJump={jumpToHeading}
             />
           </div>
-          {actionError && (
-            <p className="error sidebar-empty sidebar-action-error" onClick={() => setActionError(null)}>
-              {actionError} <span className="muted">(dismiss)</span>
-            </p>
-          )}
-          {treeLoading && (
-            <div aria-busy="true" aria-label="Loading files">
-              <div className="sidebar-loading" style={{ width: '72%' }} />
-              <div className="sidebar-loading" style={{ width: '55%' }} />
-              <div className="sidebar-loading" style={{ width: '80%' }} />
-              <div className="sidebar-loading" style={{ width: '45%' }} />
+          <div className="sidebar-view" hidden={sidebar.view !== 'search'}>
+            <div className="sidebar-head">
+              <span className="sidebar-head-label">Search</span>
             </div>
-          )}
-          {treeError && <p className="error sidebar-empty">{treeError}</p>}
-          {!treeLoading && !treeError && (
-            <FileTree
-              tree={filteredTree}
-              activePath={activePath}
-              onOpenFile={openFile}
-              onNewFile={(dir, ext) => void newFile(dir, ext)}
-              onNewFolder={(dir) => void newFolder(dir)}
-              onContextMenu={fileTreeMenu}
-              onRename={(path) => void renameFile(path)}
-              onDelete={(path) => void deleteFile(path)}
-            />
-          )}
-          {activeTab && activeTab.content !== null && (
-            <Outline content={activeTab.draft} onJump={jumpToHeading} />
-          )}
+            {source && (
+              <WorkspaceSearch
+                files={visibleFiles}
+                source={source}
+                request={searchRequest}
+                onOpen={openFromSearch}
+                onAfterReplace={reloadCleanTabs}
+              />
+            )}
+          </div>
         </aside>
 
         {!isMobile && !sidebar.autoHide && sidebarVisible && (
@@ -1358,16 +1438,6 @@ export function App() {
             setPaletteOpen(false);
           }}
           onClose={() => setPaletteOpen(false)}
-        />
-      )}
-      {searchMode && source && (
-        <WorkspaceSearch
-          files={visibleFiles}
-          source={source}
-          startMode={searchMode}
-          onOpen={openFromSearch}
-          onClose={() => setSearchMode(null)}
-          onAfterReplace={reloadCleanTabs}
         />
       )}
       <ContextMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />
