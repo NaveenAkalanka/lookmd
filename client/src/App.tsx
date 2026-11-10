@@ -55,6 +55,7 @@ import { FilePane } from './components/FilePane';
 import { EditMenu } from './components/EditMenu';
 import { WorkspaceSearch, type SearchRequest } from './components/WorkspaceSearch';
 import { ActivityBar } from './components/ActivityBar';
+import { Divider } from './components/Divider';
 import { ContextMenu, type ContextMenuState, type MenuEntry } from './components/ContextMenu';
 import { type Tab, newTab, tabDirty } from './tab';
 import type { EditorApi } from './editorApi';
@@ -72,10 +73,17 @@ import {
   setSidebar as persistSidebar,
   setSidebarWidth as persistSidebarWidth,
   setLineNumbers as persistLineNumbers,
-  getZoom,
-  setZoom as persistZoom,
+  getZoomMap,
+  setZoomMap as persistZoomMap,
+  getSplitRatio,
+  setSplitRatio as persistSplitRatio,
+  getPanesRatio,
+  setPanesRatio as persistPanesRatio,
   clampZoom,
   ZOOM_STEP,
+  type ZoomSlot,
+  type ZoomMap,
+  type PaneId,
   getFileTypes,
   setFileTypes as persistFileTypes,
   enabledExtensions,
@@ -233,7 +241,11 @@ export function App() {
   // `peek` for the hover-reveal used in auto-hide mode.
   const [sidebar, setSidebarState] = useState<SidebarPref>(() => getSidebar());
   const [lineNumbers, setLineNumbersState] = useState<boolean>(() => getLineNumbers());
-  const [zoom, setZoomState] = useState<number>(() => getZoom());
+  // Zoom per pane and view side (Read, Source, Split editor, Split preview).
+  const [zoomMap, setZoomMapState] = useState<ZoomMap>(() => getZoomMap());
+  // Divider positions: Split's editor | preview, and the two file panes.
+  const [splitRatio, setSplitRatioState] = useState<number>(() => getSplitRatio());
+  const [panesRatio, setPanesRatioState] = useState<number>(() => getPanesRatio());
   const [fileTypes, setFileTypesState] = useState<string[]>(() => getFileTypes());
   const [peek, setPeek] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => getSidebarWidth());
@@ -333,22 +345,27 @@ export function App() {
     setLineNumbersState(on);
     persistLineNumbers(on);
   }, []);
-  const changeZoom = useCallback((next: number) => {
-    const z = clampZoom(next);
-    setZoomState(z);
-    persistZoom(z);
+  const zoomBy = useCallback((pane: PaneId, slot: ZoomSlot, action: 'in' | 'out' | 'reset') => {
+    setZoomMapState((m) => {
+      const cur = m[pane][slot];
+      const next = action === 'reset' ? 1 : clampZoom(cur + (action === 'in' ? ZOOM_STEP : -ZOOM_STEP));
+      if (next === cur) return m;
+      const nm: ZoomMap = { ...m, [pane]: { ...m[pane], [slot]: next } };
+      persistZoomMap(nm);
+      return nm;
+    });
   }, []);
-  const zoomIn = useCallback(() => setZoomState((z) => {
-    const n = clampZoom(z + ZOOM_STEP);
-    persistZoom(n);
-    return n;
-  }), []);
-  const zoomOut = useCallback(() => setZoomState((z) => {
-    const n = clampZoom(z - ZOOM_STEP);
-    persistZoom(n);
-    return n;
-  }), []);
-  const zoomReset = useCallback(() => changeZoom(1), [changeZoom]);
+  const changeSplitRatio = useCallback((r: number, commit: boolean) => {
+    setSplitRatioState(r);
+    if (commit) persistSplitRatio(r);
+  }, []);
+  const changePanesRatio = useCallback((r: number) => setPanesRatioState(r), []);
+  const commitPanesRatio = useCallback((r: number) => {
+    setPanesRatioState(r);
+    persistPanesRatio(r);
+  }, []);
+  // The view side Ctrl/Cmd +/-/0 acts on: the one last hovered or clicked.
+  const zoomTargetRef = useRef<{ pane: PaneId; slot: ZoomSlot } | null>(null);
   const changeFileTypes = useCallback((ids: string[]) => {
     setFileTypesState(ids);
     persistFileTypes(ids);
@@ -368,7 +385,9 @@ export function App() {
     applyFonts(f);
     setSidebarState(getSidebar());
     setLineNumbersState(getLineNumbers());
-    setZoomState(getZoom());
+    setZoomMapState(getZoomMap());
+    setSplitRatioState(getSplitRatio());
+    setPanesRatioState(getPanesRatio());
     setFileTypesState(getFileTypes());
     setSidebarWidth(getSidebarWidth());
   }), []);
@@ -766,25 +785,42 @@ export function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Ctrl/Cmd +/-/0 zoom the content (Read/Source/Edit), like a browser but scoped.
+  // Ctrl/Cmd +/-/0 zoom one view side, like a browser but scoped: the side last
+  // hovered or clicked if it's still showing, else the focused pane's main side.
   useEffect(() => {
+    const slotsShown = (pane: PaneId): ZoomSlot[] => {
+      const path = pane === 'primary' ? activePath : secondaryPath;
+      if (!path) return [];
+      const m = effectiveMode(path, pane === 'primary' ? mode : secondaryMode);
+      const ed = (pane === 'primary' ? editing : secondaryEditing) && canWrite;
+      const shown = ed && m === 'read' ? 'split' : m;
+      return shown === 'read' ? ['read'] : shown === 'source' ? ['source'] : ['splitEditor', 'splitPreview'];
+    };
     const handler = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
       const k = e.key;
-      if (k === '=' || k === '+' || k === 'Add') {
-        e.preventDefault();
-        zoomIn();
-      } else if (k === '-' || k === '_' || k === 'Subtract') {
-        e.preventDefault();
-        zoomOut();
-      } else if (k === '0') {
-        e.preventDefault();
-        zoomReset();
+      const action =
+        k === '=' || k === '+' || k === 'Add'
+          ? 'in'
+          : k === '-' || k === '_' || k === 'Subtract'
+            ? 'out'
+            : k === '0'
+              ? 'reset'
+              : null;
+      if (!action) return;
+      let target = zoomTargetRef.current;
+      if (!target || !slotsShown(target.pane).includes(target.slot)) {
+        const pane: PaneId = focusedPane === 'secondary' && secondaryPath ? 'secondary' : 'primary';
+        const slot = slotsShown(pane)[0];
+        target = slot ? { pane, slot } : null;
       }
+      if (!target) return;
+      e.preventDefault();
+      zoomBy(target.pane, target.slot, action);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [zoomIn, zoomOut, zoomReset]);
+  }, [zoomBy, activePath, secondaryPath, mode, secondaryMode, editing, secondaryEditing, canWrite, focusedPane]);
 
   // Ctrl/Cmd-Shift-F / -H open workspace Find / Replace in Files.
   useEffect(() => {
@@ -1172,7 +1208,7 @@ export function App() {
   return (
     <div
       className="app"
-      style={{ '--sidebar-width': `${sidebarWidth}px`, '--zoom': zoom } as React.CSSProperties}
+      style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
     >
       <header className="topbar">
         <button
@@ -1406,10 +1442,14 @@ export function App() {
                 onEditing={setEditing}
                 canWrite={canWrite}
                 lineNumbers={lineNumbers}
-                zoom={zoom}
-                onZoomIn={zoomIn}
-                onZoomOut={zoomOut}
-                onZoomReset={zoomReset}
+                zoom={zoomMap.primary}
+                onZoom={(slot, action) => zoomBy('primary', slot, action)}
+                onZoomTarget={(slot) => {
+                  zoomTargetRef.current = { pane: 'primary', slot };
+                }}
+                splitRatio={splitRatio}
+                onSplitRatio={changeSplitRatio}
+                basis={secondaryTab ? panesRatio : undefined}
                 workspaceKey={workspaceKey}
                 docKey={docKeyFor(activeTab)}
                 resolveImage={primaryResolveImage}
@@ -1450,6 +1490,14 @@ export function App() {
                 }
               />
               {secondaryTab && (
+                <Divider
+                  ratio={panesRatio}
+                  label="Resize file panes"
+                  onChange={changePanesRatio}
+                  onCommit={commitPanesRatio}
+                />
+              )}
+              {secondaryTab && (
                 <FilePane
                   tab={secondaryTab}
                   mode={effectiveMode(secondaryTab.path, secondaryMode)}
@@ -1458,10 +1506,13 @@ export function App() {
                   onEditing={setSecondaryEditing}
                   canWrite={canWrite}
                   lineNumbers={lineNumbers}
-                  zoom={zoom}
-                  onZoomIn={zoomIn}
-                  onZoomOut={zoomOut}
-                  onZoomReset={zoomReset}
+                  zoom={zoomMap.secondary}
+                  onZoom={(slot, action) => zoomBy('secondary', slot, action)}
+                  onZoomTarget={(slot) => {
+                    zoomTargetRef.current = { pane: 'secondary', slot };
+                  }}
+                  splitRatio={splitRatio}
+                  onSplitRatio={changeSplitRatio}
                   workspaceKey={workspaceKey}
                   docKey={docKeyFor(secondaryTab)}
                   resolveImage={secondaryResolveImage}

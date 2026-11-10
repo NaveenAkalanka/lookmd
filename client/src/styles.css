@@ -1804,54 +1804,7 @@ body.resizing-col .sidebar {
   line-height: 1;
 }
 
-/* Zoom stepper in the file-bar: − [percentage] + . The percentage resets. */
-.zoom-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-  flex-shrink: 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-.zoom-control button:not(.zoom-level) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-.zoom-control button:not(.zoom-level):hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--text-primary);
-}
-.zoom-control button:not(.zoom-level):disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.zoom-level {
-  min-width: 42px;
-  padding: 0 2px;
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  border-left: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  cursor: pointer;
-}
-.zoom-level:hover {
-  color: var(--text-primary);
-}
-
-/* --- Segmented control (Read / Source / Edit) ---------------------------- */
+/* --- Segmented control (Read / Source / Split) --------------------------- */
 .segmented {
   display: inline-flex;
   border: 1px solid var(--border);
@@ -1982,12 +1935,7 @@ body.resizing-col .sidebar {
   min-height: 0;
   overflow: hidden;
 }
-.panes-row > .pane + .pane {
-  border-left: 1px solid var(--border);
-}
-.panes-column > .pane + .pane {
-  border-top: 1px solid var(--border);
-}
+/* The line between two file panes is drawn by their Divider. */
 /* The focused pane (keyboard-Save target) gets a subtle accent rule on top. */
 .pane-focused > .file-bar {
   box-shadow: inset 0 2px 0 var(--accent-2);
@@ -2012,13 +1960,16 @@ body.resizing-col .sidebar {
   min-height: 0;
 }
 .split-pane {
-  flex: 1 1 50%;
+  position: relative;
+  flex: 1 1 0;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.split-scroll {
   height: 100%;
   overflow: auto;
-}
-.split-editor {
-  border-right: 1px solid var(--border);
 }
 .split-preview {
   background: var(--background);
@@ -2028,7 +1979,7 @@ body.resizing-col .sidebar {
 .split-preview .read {
   max-width: none;
   padding: 24px 28px 64px;
-  font-size: 16px;
+  font-size: calc(16px * var(--zoom, 1));
 }
 
 /* --- Syntax highlighting (highlight.js classes) -------------------------- *
@@ -3539,8 +3490,178 @@ body.resizing-col .sidebar {
   .file-bar > .file-bar-name {
     flex-shrink: 1;
   }
-  .file-bar .zoom-control,
   .file-bar .pane-split-open {
+    display: none;
+  }
+  .file-bar .segmented-item {
+    padding: 5px 9px;
+  }
+}
+
+/* --- Draggable dividers (Split columns, file panes) ---------------------- */
+/* A 7px grab strip with zero net layout size (negative margins), drawing a
+   1px rule that turns accent on hover, focus and drag. */
+.divider {
+  position: relative;
+  z-index: 5;
+  flex: 0 0 auto;
+  touch-action: none;
+}
+.divider-x {
+  width: 7px;
+  margin: 0 -3px;
+  cursor: col-resize;
+}
+.divider-y {
+  height: 7px;
+  margin: -3px 0;
+  cursor: row-resize;
+}
+.divider::after {
+  content: '';
+  position: absolute;
+  background: var(--border);
+  transition: background 0.15s var(--ease-out);
+}
+.divider-x::after {
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+}
+.divider-y::after {
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 1px;
+}
+.divider:hover::after,
+.divider:focus-visible::after,
+.divider-dragging::after {
+  background: var(--accent);
+}
+.divider-x:hover::after,
+.divider-x:focus-visible::after,
+.divider-x.divider-dragging::after {
+  width: 2px;
+}
+.divider-y:hover::after,
+.divider-y:focus-visible::after,
+.divider-y.divider-dragging::after {
+  height: 2px;
+}
+.divider:focus-visible {
+  outline: none;
+}
+body.resizing-row {
+  cursor: row-resize;
+  user-select: none;
+}
+
+/* --- Floating zoom pill (one per view side) ------------------------------ */
+.zoom-host {
+  position: relative;
+}
+.zoom-pill {
+  position: absolute;
+  right: 22px;
+  bottom: 14px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--text-primary) 12%, transparent);
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out);
+}
+.zoom-host:hover > .zoom-pill,
+.zoom-pill:focus-within,
+.zoom-pill-flash {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.zoom-pill button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.zoom-pill button:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+.zoom-pill button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.zoom-pill .zoom-pill-level {
+  min-width: 46px;
+}
+/* Hidden while drawing annotations: the overlay owns the pointer then. */
+.annotate-active .zoom-pill {
+  display: none;
+}
+/* Touch has no hover: keep it faint but reachable, with finger-sized buttons. */
+@media (hover: none) {
+  .zoom-pill {
+    opacity: 0.6;
+    transform: none;
+    pointer-events: auto;
+  }
+  .zoom-pill-flash {
+    opacity: 1;
+  }
+  .zoom-pill button {
+    min-width: 34px;
+    height: 34px;
+  }
+}
+
+/* A file bar adapts to its own pane's width, not the window's: a pane
+   resized narrow drops the Edit label, tightens the switch, and wraps onto a
+   second row rather than clipping Save off the edge. */
+.pane {
+  container-type: inline-size;
+  container-name: pane;
+}
+@container pane (max-width: 560px) {
+  .file-bar {
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    height: auto;
+    min-height: var(--topbar-height);
+    padding-block: 5px;
+    overflow: visible;
+  }
+  .file-bar > * {
+    flex-shrink: 0;
+  }
+  .file-bar > .file-bar-name {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  /* The second pane's file picker keeps room to show which file it holds. */
+  .file-bar > .pane-switch {
+    flex-shrink: 1;
+    min-width: 80px;
+  }
+  .file-bar .edit-toggle .btn-label {
     display: none;
   }
   .file-bar .segmented-item {

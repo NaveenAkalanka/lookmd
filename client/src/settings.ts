@@ -20,6 +20,8 @@ const SIDEBAR_KEY = 'lookmd.sidebar';
 const SIDEBAR_WIDTH_KEY = 'lookmd.sidebarWidth';
 const LINE_NUMBERS_KEY = 'lookmd.lineNumbers';
 const ZOOM_KEY = 'lookmd.zoom';
+const SPLIT_RATIO_KEY = 'lookmd.splitRatio';
+const PANES_RATIO_KEY = 'lookmd.panesRatio';
 const FILETYPES_KEY = 'lookmd.fileTypes';
 
 /** Every settings key, so the cross-tab listener can tell our writes from noise. */
@@ -30,6 +32,8 @@ const SETTINGS_KEYS: ReadonlySet<string> = new Set([
   SIDEBAR_WIDTH_KEY,
   LINE_NUMBERS_KEY,
   ZOOM_KEY,
+  SPLIT_RATIO_KEY,
+  PANES_RATIO_KEY,
   FILETYPES_KEY,
 ]);
 
@@ -251,13 +255,75 @@ export function clampZoom(z: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, r));
 }
 
-export function getZoom(): number {
-  const n = parseFloat(readRaw(ZOOM_KEY) ?? '');
-  return Number.isFinite(n) ? clampZoom(n) : DEFAULT_ZOOM;
+/** Which view side a zoom level belongs to. Each pane keeps one per side. */
+export type ZoomSlot = 'read' | 'source' | 'splitEditor' | 'splitPreview';
+export type PaneId = 'primary' | 'secondary';
+export type ZoomMap = Record<PaneId, Record<ZoomSlot, number>>;
+
+const ZOOM_SLOTS: readonly ZoomSlot[] = ['read', 'source', 'splitEditor', 'splitPreview'];
+const PANE_IDS: readonly PaneId[] = ['primary', 'secondary'];
+
+function filledZoom(z: number): Record<ZoomSlot, number> {
+  return { read: z, source: z, splitEditor: z, splitPreview: z };
 }
 
-export function setZoom(z: number): void {
-  writeRaw(ZOOM_KEY, String(clampZoom(z)));
+/**
+ * Zoom levels per pane and view side. Stored under the old single-zoom key:
+ * a plain number from before per-side zoom carries over to every side.
+ */
+export function getZoomMap(): ZoomMap {
+  const raw = readRaw(ZOOM_KEY);
+  const legacy = raw !== null && /^\s*[\d.]+\s*$/.test(raw) ? parseFloat(raw) : NaN;
+  const base = Number.isFinite(legacy) ? clampZoom(legacy) : DEFAULT_ZOOM;
+  const out: ZoomMap = { primary: filledZoom(base), secondary: filledZoom(base) };
+  if (raw === null || Number.isFinite(legacy)) return out;
+  try {
+    const parsed = JSON.parse(raw) as Partial<Record<PaneId, Partial<Record<ZoomSlot, unknown>>>>;
+    for (const pane of PANE_IDS) {
+      for (const slot of ZOOM_SLOTS) {
+        const v = parsed?.[pane]?.[slot];
+        if (typeof v === 'number' && Number.isFinite(v)) out[pane][slot] = clampZoom(v);
+      }
+    }
+  } catch {
+    /* unreadable: defaults */
+  }
+  return out;
+}
+
+export function setZoomMap(m: ZoomMap): void {
+  writeRaw(ZOOM_KEY, JSON.stringify(m));
+}
+
+// --- Divider sizes -------------------------------------------------------------
+
+/** Share of the first side, kept between 20% and 80% so neither side vanishes. */
+export const RATIO_MIN = 0.2;
+export const RATIO_MAX = 0.8;
+
+export function clampRatio(r: number): number {
+  return Math.min(RATIO_MAX, Math.max(RATIO_MIN, Math.round(r * 1000) / 1000));
+}
+
+function getRatio(key: string): number {
+  const n = parseFloat(readRaw(key) ?? '');
+  return Number.isFinite(n) ? clampRatio(n) : 0.5;
+}
+
+/** Editor | preview divider inside Split. */
+export function getSplitRatio(): number {
+  return getRatio(SPLIT_RATIO_KEY);
+}
+export function setSplitRatio(r: number): void {
+  writeRaw(SPLIT_RATIO_KEY, String(clampRatio(r)));
+}
+
+/** Divider between two side-by-side (or stacked) file panes. */
+export function getPanesRatio(): number {
+  return getRatio(PANES_RATIO_KEY);
+}
+export function setPanesRatio(r: number): void {
+  writeRaw(PANES_RATIO_KEY, String(clampRatio(r)));
 }
 
 /**

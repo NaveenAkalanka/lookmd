@@ -19,8 +19,6 @@ import { isMarkdownPath } from '@lookmd/shared';
 import { Icon } from './Icon';
 import {
   Cancel01Icon,
-  MinusSignIcon,
-  PlusSignIcon,
   HighlighterIcon,
   PencilEdit02Icon,
 } from '@hugeicons/core-free-icons';
@@ -36,7 +34,9 @@ import {
   type ToolId,
   type AnnotColor,
 } from '../annotations';
-import { ZOOM_MIN, ZOOM_MAX } from '../settings';
+import type { ZoomSlot } from '../settings';
+import { ZoomPill } from './ZoomPill';
+import { Divider } from './Divider';
 import { type Tab, tabDirty } from '../tab';
 import type { EditorApi } from '../editorApi';
 
@@ -61,11 +61,16 @@ interface Props {
   /** Whether this file can be saved at all (false in a read-only build). */
   canWrite: boolean;
   lineNumbers: boolean;
-  /** Content zoom multiplier and its steppers (global; same value in every pane). */
-  zoom: number;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
-  onZoomReset: () => void;
+  /** This pane's zoom level for each view side (Read, Source, Split's two sides). */
+  zoom: Record<ZoomSlot, number>;
+  onZoom: (slot: ZoomSlot, action: 'in' | 'out' | 'reset') => void;
+  /** The side the pointer is over / last clicked, for Ctrl/Cmd +/-/0. */
+  onZoomTarget: (slot: ZoomSlot) => void;
+  /** Split's editor | preview divider (share of the editor side). */
+  splitRatio: number;
+  onSplitRatio: (ratio: number, commit: boolean) => void;
+  /** This pane's share when two file panes are open (flex-basis), if any. */
+  basis?: number;
   /** Identity of the active workspace, for keying this file's annotations. */
   workspaceKey: string;
   docKey: string;
@@ -99,9 +104,11 @@ export function FilePane({
   canWrite,
   lineNumbers,
   zoom,
-  onZoomIn,
-  onZoomOut,
-  onZoomReset,
+  onZoom,
+  onZoomTarget,
+  splitRatio,
+  onSplitRatio,
+  basis,
   workspaceKey,
   docKey,
   resolveImage,
@@ -244,7 +251,7 @@ export function FilePane({
           ? view
           : editorShown
             ? view.querySelector('.cm-scroller')
-            : (view.querySelector('.source-wrap') ?? view.querySelector('.split-pane'));
+            : (view.querySelector('.source-wrap') ?? view.querySelector('.split-scroll'));
       if (host) setScrollHost(host);
       else if (tries++ < 60) raf = requestAnimationFrame(find);
     };
@@ -265,6 +272,7 @@ export function FilePane({
   return (
     <section
       className={`pane${focused ? ' pane-focused' : ''}`}
+      style={basis !== undefined ? { flex: `0 0 ${basis * 100}%` } : undefined}
       onMouseDownCapture={onFocusPane}
     >
       <div className="file-bar">
@@ -303,32 +311,6 @@ export function FilePane({
             <span className="btn-label">Edit</span>
           </button>
         )}
-        <div className="zoom-control" role="group" aria-label="Zoom">
-          <button
-            onClick={onZoomOut}
-            disabled={zoom <= ZOOM_MIN}
-            title="Zoom out (Ctrl/Cmd -)"
-            aria-label="Zoom out"
-          >
-            <Icon icon={MinusSignIcon} size={14} />
-          </button>
-          <button
-            className="zoom-level"
-            onClick={onZoomReset}
-            title="Reset zoom (Ctrl/Cmd 0)"
-            aria-label={`Zoom ${Math.round(zoom * 100)} percent, click to reset`}
-          >
-            {Math.round(zoom * 100)}%
-          </button>
-          <button
-            onClick={onZoomIn}
-            disabled={zoom >= ZOOM_MAX}
-            title="Zoom in (Ctrl/Cmd +)"
-            aria-label="Zoom in"
-          >
-            <Icon icon={PlusSignIcon} size={14} />
-          </button>
-        </div>
         {annotatable && (
           <button
             className={`btn icon-btn${annotateOn ? ' icon-btn-active' : ''}`}
@@ -377,8 +359,16 @@ export function FilePane({
       )}
       {tab.saveError && <div className="banner banner-error">{tab.saveError}</div>}
 
-      <div className={`pane-body${overlayOn ? ' annotate-active' : ''}${overlayOn && editorShown ? ' annotate-locked' : ''}`}>
-      <div className="view" ref={viewRef}>
+      <div
+        className={`pane-body${shown === 'read' ? ' zoom-host' : ''}${overlayOn ? ' annotate-active' : ''}${overlayOn && editorShown ? ' annotate-locked' : ''}`}
+        onPointerEnter={shown === 'read' ? () => onZoomTarget('read') : undefined}
+        onPointerDownCapture={shown === 'read' ? () => onZoomTarget('read') : undefined}
+      >
+      <div
+        className="view"
+        ref={viewRef}
+        style={shown === 'read' ? ({ '--zoom': zoom.read } as React.CSSProperties) : undefined}
+      >
         {tab.loading && <div className="placeholder">Loading {tab.path}…</div>}
         {tab.error && <div className="placeholder error">{tab.error}</div>}
         {tab.content !== null && !tab.loading && !tab.error && (
@@ -388,26 +378,67 @@ export function FilePane({
             )}
             {(shown === 'source' || shown === 'split') && (
               <div className={`split${shown === 'split' ? '' : ' split-single'}`}>
-                <div className="split-pane split-editor">
-                  {editorShown ? (
-                    <Editor
-                      value={tab.draft}
-                      docKey={docKey}
-                      onChange={onChangeDraft}
-                      onSave={onSave}
-                      lineNumbers={lineNumbers}
-                      onFocusApi={onEditorFocusApi}
-                      onReleaseApi={onEditorReleaseApi}
-                      reveal={reveal}
-                      onApi={setPaneApi}
-                    />
-                  ) : (
-                    <SourceView content={tab.draft} lineNumbers={lineNumbers} />
-                  )}
+                {/* Always the first child, so the editor stays mounted when the
+                    preview column comes and goes. */}
+                <div
+                  className="split-pane split-editor zoom-host"
+                  style={{
+                    '--zoom': shown === 'split' ? zoom.splitEditor : zoom.source,
+                    ...(shown === 'split' ? { flex: `0 0 ${splitRatio * 100}%` } : {}),
+                  } as React.CSSProperties}
+                  onPointerEnter={() => onZoomTarget(shown === 'split' ? 'splitEditor' : 'source')}
+                  onPointerDownCapture={() => onZoomTarget(shown === 'split' ? 'splitEditor' : 'source')}
+                >
+                  <div className="split-scroll">
+                    {editorShown ? (
+                      <Editor
+                        value={tab.draft}
+                        docKey={docKey}
+                        onChange={onChangeDraft}
+                        onSave={onSave}
+                        lineNumbers={lineNumbers}
+                        onFocusApi={onEditorFocusApi}
+                        onReleaseApi={onEditorReleaseApi}
+                        reveal={reveal}
+                        onApi={setPaneApi}
+                      />
+                    ) : (
+                      <SourceView content={tab.draft} lineNumbers={lineNumbers} />
+                    )}
+                  </div>
+                  <ZoomPill
+                    zoom={shown === 'split' ? zoom.splitEditor : zoom.source}
+                    label={shown === 'split' ? 'Editor' : 'Source'}
+                    onIn={() => onZoom(shown === 'split' ? 'splitEditor' : 'source', 'in')}
+                    onOut={() => onZoom(shown === 'split' ? 'splitEditor' : 'source', 'out')}
+                    onReset={() => onZoom(shown === 'split' ? 'splitEditor' : 'source', 'reset')}
+                  />
                 </div>
                 {shown === 'split' && (
-                  <div className="split-pane split-preview">
-                    <ReadView content={tab.draft} resolveImage={resolveImage} onNavigate={onNavigate} />
+                  <Divider
+                    ratio={splitRatio}
+                    label="Resize editor and preview"
+                    onChange={(r) => onSplitRatio(r, false)}
+                    onCommit={(r) => onSplitRatio(r, true)}
+                  />
+                )}
+                {shown === 'split' && (
+                  <div
+                    className="split-pane split-preview zoom-host"
+                    style={{ '--zoom': zoom.splitPreview } as React.CSSProperties}
+                    onPointerEnter={() => onZoomTarget('splitPreview')}
+                    onPointerDownCapture={() => onZoomTarget('splitPreview')}
+                  >
+                    <div className="split-scroll">
+                      <ReadView content={tab.draft} resolveImage={resolveImage} onNavigate={onNavigate} />
+                    </div>
+                    <ZoomPill
+                      zoom={zoom.splitPreview}
+                      label="Preview"
+                      onIn={() => onZoom('splitPreview', 'in')}
+                      onOut={() => onZoom('splitPreview', 'out')}
+                      onReset={() => onZoom('splitPreview', 'reset')}
+                    />
                   </div>
                 )}
               </div>
@@ -415,6 +446,15 @@ export function FilePane({
           </Suspense>
         )}
       </div>
+        {shown === 'read' && tab.content !== null && !tab.loading && !tab.error && (
+          <ZoomPill
+            zoom={zoom.read}
+            label="Read"
+            onIn={() => onZoom('read', 'in')}
+            onOut={() => onZoom('read', 'out')}
+            onReset={() => onZoom('read', 'reset')}
+          />
+        )}
 
         {overlayOn && (
           <>
