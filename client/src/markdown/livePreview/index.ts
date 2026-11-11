@@ -7,32 +7,31 @@
  * links) the widgets and click handlers call into.
  */
 
-import { EditorSelection, Facet, type Extension } from '@codemirror/state';
+import { EditorSelection, StateField, type Extension } from '@codemirror/state';
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { buildInline } from './inline.ts';
 import { revealField } from './reveal.ts';
 import { linkAt } from './links.ts';
+import { buildBlocks } from './blocks.ts';
+import { imageHeights, liveHooks } from './hooks.ts';
 
-/** What the live preview needs from its host (the Editor component). */
-export interface LiveHooks {
-  /** Resolve an image `src` through the active file source. */
-  resolveImage(src: string): Promise<string>;
-  /** Open a link the user Ctrl/Cmd-clicked (or tapped "Open link" on). */
-  openLink(href: string): void;
-  /** True on touch-first devices (no Ctrl/Cmd-click). */
-  coarsePointer(): boolean;
-}
+export { liveHooks, type LiveHooks } from './hooks.ts';
 
-const DEFAULT_HOOKS: LiveHooks = {
-  resolveImage: () => Promise.reject(new Error('No image source')),
-  openLink: () => {},
-  coarsePointer: () => false,
-};
-
-export const liveHooks = Facet.define<LiveHooks, LiveHooks>({
-  combine: (values) => values[0] ?? DEFAULT_HOOKS,
+/**
+ * Bumped by any transaction that carries effects but no edit — notably the
+ * parser's background progress — so block decorations below the first screen
+ * appear once that part of the document is parsed.
+ */
+const parseTick = StateField.define<number>({
+  create: () => 0,
+  update: (n, tr) => (!tr.docChanged && tr.effects.length > 0 ? n + 1 : n),
 });
+
+/** Block decorations (images, …) must come from state, not a plugin. */
+const blockDecorations = EditorView.decorations.compute(['doc', revealField, parseTick, imageHeights], (state) =>
+  buildBlocks(state, state.field(revealField), state.field(imageHeights)),
+);
 
 /** The revealed lines, plus the line an IME composition is active on. */
 function currentReveal(view: EditorView): Set<number> {
@@ -126,7 +125,7 @@ const linkClicks = EditorView.domEventHandlers({
 
 /** The live-preview behaviour (pair it with `liveTheme`). */
 export function livePreview(): Extension {
-  return [revealField, stableClick, linkClicks, inlinePlugin];
+  return [revealField, parseTick, imageHeights, blockDecorations, stableClick, linkClicks, inlinePlugin];
 }
 
 export { liveTheme } from './theme.ts';

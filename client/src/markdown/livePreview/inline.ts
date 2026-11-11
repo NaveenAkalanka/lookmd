@@ -42,6 +42,7 @@ const SPANS: Record<string, { cls: string; mark: string }> = {
 
 const HTML_NODES = new Set(['HTMLTag', 'HTMLBlock', 'Comment', 'CommentBlock', 'ProcessingInstruction']);
 const QUOTE_LINE = Decoration.line({ class: 'cm-lp-quote' });
+const HIDDEN_LINE = Decoration.line({ class: 'cm-lp-hidden-line' });
 const BULLET = Decoration.replace({ widget: new BulletWidget() });
 const RULE = Decoration.replace({ widget: new RuleWidget() });
 
@@ -109,6 +110,7 @@ export function buildInline(
   }
   const inWiki = (from: number, to: number) => wikis.some((w) => from < w.to && to > w.from);
   const quoteLines = new Set<number>();
+  const imageLines = new Map<number, [number, number][]>();
 
   for (const range of ranges) {
     tree.iterate({
@@ -198,8 +200,17 @@ export function buildInline(
           return false;
         }
 
-        // Images render in Task 3; leave their syntax alone here.
-        if (name === 'Image') return false;
+        // Images: the picture is a block widget (blocks.ts); the syntax hides
+        // off the cursor line, and an image-only line collapses.
+        if (name === 'Image') {
+          const line = doc.lineAt(ref.from);
+          if (reveal.has(line.number) || !ref.node.getChild('URL')) return false;
+          hide(ref.from, ref.to);
+          const list = imageLines.get(line.number) ?? [];
+          list.push([ref.from - line.from, ref.to - line.from]);
+          imageLines.set(line.number, list);
+          return false;
+        }
 
         if (name === 'ListMark') {
           if (revealed(ref.from, ref.to)) return false;
@@ -242,6 +253,13 @@ export function buildInline(
         return;
       },
     });
+  }
+
+  for (const [n, spans] of imageLines) {
+    const line = doc.line(n);
+    let rest = line.text;
+    for (const [a, b] of [...spans].sort((x, y) => y[0] - x[0])) rest = rest.slice(0, a) + rest.slice(b);
+    if (!rest.trim()) out.push(HIDDEN_LINE.range(line.from));
   }
 
   return {

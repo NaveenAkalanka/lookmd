@@ -74,6 +74,14 @@ export const liveTheme = EditorView.theme({
     fontSize: '0.88em',
     color: 'var(--text-tertiary)',
   },
+  // An image-only line keeps its height (so arrow keys can reach it to edit
+  // the syntax); off the cursor it's empty, with the picture below it.
+  '.cm-lp-image': { padding: '0.4em 0' },
+  '.cm-lp-image img': {
+    display: 'block',
+    maxWidth: '100%',
+    height: 'auto',
+  },
   '.cm-lp-code': {
     fontFamily: 'var(--font-mono)',
     fontSize: '0.88em',
