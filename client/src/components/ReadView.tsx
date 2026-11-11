@@ -20,6 +20,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeSlug from 'rehype-slug';
 import { remarkWikiLink } from '../markdown/remarkWikiLink';
+import { isExternalUrl } from '../markdown/urls';
 import { CodeBlock } from './CodeBlock';
 import { Icon } from './Icon';
 import { ImageNotFound01Icon } from '@hugeicons/core-free-icons';
@@ -34,9 +35,6 @@ interface Props {
 const remarkPlugins = [remarkGfm, remarkWikiLink];
 const rehypePlugins = [rehypeSlug, rehypeHighlight];
 
-function isExternalUrl(src: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith('//');
-}
 
 export function ReadView({ content, resolveImage, onNavigate }: Props) {
   const components = useMemo<Components>(() => {

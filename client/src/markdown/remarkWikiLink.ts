@@ -10,6 +10,18 @@ import type { Root, Text, Link, PhrasingContent } from 'mdast';
 
 const WIKILINK = /\[\[([^\]]+)\]\]/g;
 
+/**
+ * Resolve the inside of `[[...]]`: the target (before `|`) gets `.md` if it has
+ * no extension; the label is the alias (after `|`) or the target.
+ */
+export function parseWikiLink(inner: string): { url: string; label: string } {
+  const parts = inner.split('|');
+  const target = (parts[0] ?? '').trim();
+  const label = (parts[1] ?? parts[0] ?? '').trim();
+  const url = /\.[a-z0-9]+$/i.test(target) ? target : `${target}.md`;
+  return { url, label };
+}
+
 export function remarkWikiLink() {
   return (tree: Root): void => {
     visit(tree, 'text', (node: Text, index, parent) => {
@@ -28,10 +40,7 @@ export function remarkWikiLink() {
         if (m.index > last) {
           children.push({ type: 'text', value: value.slice(last, m.index) });
         }
-        const parts = inner.split('|');
-        const target = (parts[0] ?? '').trim();
-        const label = (parts[1] ?? parts[0] ?? '').trim();
-        const url = /\.[a-z0-9]+$/i.test(target) ? target : `${target}.md`;
+        const { url, label } = parseWikiLink(inner);
         const link: Link = {
           type: 'link',
           url,

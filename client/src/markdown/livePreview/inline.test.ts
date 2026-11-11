@@ -76,3 +76,76 @@ describe('buildInline: invariants', () => {
     assert.deepEqual(summarize(decorations, state), ['hide 5-7', 'mark cm-lp-h1 7-8']);
   });
 });
+
+describe('buildInline: links', () => {
+  it('a link shows only its text', () => {
+    assert.deepEqual(all('[t](u.md)\n‸'), ['hide 0-1', 'mark cm-lp-link cm-lp-link-internal 1-2', 'hide 2-9']);
+  });
+
+  it('an external link is not marked internal', () => {
+    assert.deepEqual(all('[t](https://x.io)\n‸'), ['hide 0-1', 'mark cm-lp-link 1-2', 'hide 2-17']);
+  });
+
+  it('a link is raw on the cursor line', () => {
+    assert.deepEqual(all('[t](u.md) ‸'), []);
+  });
+
+  it('brackets without a url are left alone', () => {
+    assert.deepEqual(all('[just brackets]\n‸'), []);
+  });
+
+  it('a wiki link shows its alias', () => {
+    assert.deepEqual(all('[[Note|al]]\n‸'), ['hide 0-7', 'mark cm-lp-link cm-lp-link-internal 7-9', 'hide 9-11']);
+  });
+
+  it('a wiki link without alias shows the note name', () => {
+    assert.deepEqual(all('[[Note]]\n‸'), ['hide 0-2', 'mark cm-lp-link cm-lp-link-internal 2-6', 'hide 6-8']);
+  });
+
+  it('a wiki link inside inline code stays code', () => {
+    assert.deepEqual(all('`[[Note]]`\n‸'), ['hide 0-1', 'mark cm-lp-code 0-10', 'hide 9-10']);
+  });
+
+  it('a bare URL is link-styled, nothing hidden', () => {
+    assert.deepEqual(all('see https://x.io now\n‸'), ['mark cm-lp-link 4-16']);
+  });
+
+  it('an <autolink> hides its angle brackets', () => {
+    assert.deepEqual(all('<https://x.io>\n‸'), ['hide 0-1', 'mark cm-lp-link 1-13', 'hide 13-14']);
+  });
+});
+
+describe('buildInline: lists, quotes, rules, HTML', () => {
+  it('a bullet marker becomes a bullet widget', () => {
+    assert.deepEqual(all('- a\n‸'), ['widget bullet 0-1']);
+  });
+
+  it('a bullet is raw on the cursor line', () => {
+    assert.deepEqual(all('- a‸'), []);
+  });
+
+  it('ordered numbers stay, dimmed', () => {
+    assert.deepEqual(all('1. a\n‸'), ['mark cm-lp-ordered 0-2']);
+  });
+
+  it('a task replaces marker and box with a checkbox', () => {
+    assert.deepEqual(all('- [x] a\n‸'), ['widget task 0-5']);
+  });
+
+  it('a blockquote hides "> " and styles the line', () => {
+    assert.deepEqual(all('> q\n\n‸'), ['line cm-lp-quote L1', 'hide 0-2']);
+  });
+
+  it('a rule becomes a rule widget', () => {
+    assert.deepEqual(all('***\n‸'), ['widget rule 0-3']);
+  });
+
+  it('raw HTML is dimmed, never hidden', () => {
+    assert.deepEqual(all('<b>x</b>\n‸'), ['mark cm-lp-html 0-3', 'mark cm-lp-html 4-8']);
+  });
+
+  it('widgets are atomic too', () => {
+    const { state, atomic } = build('- [ ] a\n‸');
+    assert.deepEqual(summarize(atomic, state), ['widget task 0-5']);
+  });
+});

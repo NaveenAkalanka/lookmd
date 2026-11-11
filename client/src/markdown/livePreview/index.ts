@@ -12,6 +12,7 @@ import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate
 import { syntaxTree } from '@codemirror/language';
 import { buildInline } from './inline.ts';
 import { revealField } from './reveal.ts';
+import { linkAt } from './links.ts';
 
 /** What the live preview needs from its host (the Editor component). */
 export interface LiveHooks {
@@ -106,9 +107,26 @@ const stableClick = EditorView.mouseSelectionStyle.of((view, down) => {
   };
 });
 
+/**
+ * Ctrl/Cmd-click opens a link; a plain click just places the cursor (which
+ * reveals the raw link for editing).
+ */
+const linkClicks = EditorView.domEventHandlers({
+  mousedown(e, view) {
+    if (e.button !== 0 || !(e.ctrlKey || e.metaKey)) return false;
+    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+    if (pos == null) return false;
+    const href = linkAt(view.state, pos);
+    if (!href) return false;
+    e.preventDefault();
+    view.state.facet(liveHooks).openLink(href);
+    return true;
+  },
+});
+
 /** The live-preview behaviour (pair it with `liveTheme`). */
 export function livePreview(): Extension {
-  return [revealField, stableClick, inlinePlugin];
+  return [revealField, stableClick, linkClicks, inlinePlugin];
 }
 
 export { liveTheme } from './theme.ts';

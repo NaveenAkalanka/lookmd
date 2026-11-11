@@ -12,6 +12,9 @@ import type { EditorState, Range } from '@codemirror/state';
 import { Decoration, type DecorationSet } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { frontMatterRange, touchesReveal } from './reveal.ts';
+import { inCodeOrHtml, wikiLinksIn } from './links.ts';
+import { isExternalUrl } from '../urls.ts';
+import { BulletWidget, RuleWidget, TaskWidget } from './widgets.ts';
 
 export interface InlineDecorations {
   decorations: DecorationSet;
@@ -37,6 +40,15 @@ const SPANS: Record<string, { cls: string; mark: string }> = {
   InlineCode: { cls: 'cm-lp-code', mark: 'CodeMark' },
 };
 
+const HTML_NODES = new Set(['HTMLTag', 'HTMLBlock', 'Comment', 'CommentBlock', 'ProcessingInstruction']);
+const QUOTE_LINE = Decoration.line({ class: 'cm-lp-quote' });
+const BULLET = Decoration.replace({ widget: new BulletWidget() });
+const RULE = Decoration.replace({ widget: new RuleWidget() });
+
+function linkClass(url: string): string {
+  return isExternalUrl(url) || url.startsWith('#') ? 'cm-lp-link' : 'cm-lp-link cm-lp-link-internal';
+}
+
 const ATX = /^ATXHeading(\d)$/;
 const SETEXT = /^SetextHeading(\d)$/;
 
@@ -53,15 +65,50 @@ export function buildInline(
   const fm = frontMatterRange(state);
   const tree = syntaxTree(state);
   const out: Range<Decoration>[] = [];
+  // Replacements (hidden syntax and widgets): the cursor steps over these.
+  const atomic: Range<Decoration>[] = [];
   const seen = new Set<string>();
 
   const hide = (from: number, to: number) => {
-    if (to > from) out.push(HIDE.range(from, to));
+    if (to > from) {
+      const r = HIDE.range(from, to);
+      out.push(r);
+      atomic.push(r);
+    }
+  };
+  const replace = (deco: Decoration, from: number, to: number) => {
+    const r = deco.range(from, to);
+    out.push(r);
+    atomic.push(r);
   };
   const mark = (cls: string, from: number, to: number) => {
     if (to > from) out.push(markOf(cls).range(from, to));
   };
   const revealed = (from: number, to: number) => touchesReveal(state, reveal, from, to);
+
+  // Wiki links first: found by pattern per line (Lezer sees nested Links).
+  const wikis: { from: number; to: number }[] = [];
+  const wikiLines = new Set<number>();
+  for (const range of ranges) {
+    const last = doc.lineAt(range.to).number;
+    for (let n = doc.lineAt(range.from).number; n <= last; n++) {
+      if (wikiLines.has(n)) continue;
+      wikiLines.add(n);
+      const line = doc.line(n);
+      if (fm && line.from < fm.to) continue;
+      for (const w of wikiLinksIn(line.text)) {
+        const from = line.from + w.from;
+        if (inCodeOrHtml(tree, from)) continue;
+        wikis.push({ from, to: line.from + w.to });
+        if (reveal.has(n) || w.labelTo <= w.labelFrom) continue;
+        hide(from, line.from + w.labelFrom);
+        mark('cm-lp-link cm-lp-link-internal', line.from + w.labelFrom, line.from + w.labelTo);
+        hide(line.from + w.labelTo, line.from + w.to);
+      }
+    }
+  }
+  const inWiki = (from: number, to: number) => wikis.some((w) => from < w.to && to > w.from);
+  const quoteLines = new Set<number>();
 
   for (const range of ranges) {
     tree.iterate({
@@ -119,6 +166,79 @@ export function buildInline(
           mark(span.cls, ref.from, ref.to);
           return;
         }
+
+        if (name === 'Link') {
+          if (inWiki(ref.from, ref.to)) return false;
+          const url = ref.node.getChild('URL');
+          const marks = ref.node.getChildren('LinkMark');
+          const open = marks[0];
+          const close = marks[1];
+          if (!url || !open || !close) return;
+          if (revealed(ref.from, ref.to)) return false;
+          hide(ref.from, open.to);
+          mark(linkClass(doc.sliceString(url.from, url.to)), open.to, close.from);
+          hide(close.from, ref.to);
+          return;
+        }
+
+        if (name === 'Autolink') {
+          const url = ref.node.getChild('URL');
+          if (!url || revealed(ref.from, ref.to)) return false;
+          hide(ref.from, url.from);
+          mark(linkClass(doc.sliceString(url.from, url.to)), url.from, url.to);
+          hide(url.to, ref.to);
+          return false;
+        }
+
+        if (name === 'URL') {
+          // A bare URL (GFM autolink); URLs inside links/images are handled there.
+          const parent = ref.node.parent?.name ?? '';
+          if (parent === 'Link' || parent === 'Autolink' || parent === 'Image') return false;
+          if (!revealed(ref.from, ref.to) && !inWiki(ref.from, ref.to)) mark('cm-lp-link', ref.from, ref.to);
+          return false;
+        }
+
+        // Images render in Task 3; leave their syntax alone here.
+        if (name === 'Image') return false;
+
+        if (name === 'ListMark') {
+          if (revealed(ref.from, ref.to)) return false;
+          const item = ref.node.parent;
+          const list = item?.parent?.name;
+          const marker = item?.getChild('Task')?.getChild('TaskMarker');
+          if (marker) {
+            const checked = /x/i.test(doc.sliceString(marker.from, marker.to));
+            replace(Decoration.replace({ widget: new TaskWidget(checked, marker.from - ref.from) }), ref.from, marker.to);
+          } else if (list === 'BulletList') {
+            replace(BULLET, ref.from, ref.to);
+          } else if (list === 'OrderedList') {
+            mark('cm-lp-ordered', ref.from, ref.to);
+          }
+          return false;
+        }
+
+        if (name === 'QuoteMark') {
+          const line = doc.lineAt(ref.from);
+          if (reveal.has(line.number)) return false;
+          const after = doc.sliceString(ref.to, ref.to + 1);
+          hide(ref.from, ref.to + (after === ' ' ? 1 : 0));
+          if (!quoteLines.has(line.number)) {
+            quoteLines.add(line.number);
+            out.push(QUOTE_LINE.range(line.from));
+          }
+          return false;
+        }
+
+        if (name === 'HorizontalRule') {
+          if (!revealed(ref.from, ref.to)) replace(RULE, ref.from, ref.to);
+          return false;
+        }
+
+        // Raw HTML is never rendered: dimmed mono, on any line.
+        if (HTML_NODES.has(name)) {
+          mark('cm-lp-html', ref.from, ref.to);
+          return false;
+        }
         return;
       },
     });
@@ -126,9 +246,6 @@ export function buildInline(
 
   return {
     decorations: Decoration.set(out, true),
-    atomic: Decoration.set(
-      out.filter((r) => r.value === HIDE),
-      true,
-    ),
+    atomic: Decoration.set(atomic, true),
   };
 }

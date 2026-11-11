@@ -32,6 +32,7 @@ import type { EditorApi } from '../editorApi';
 import { detectEol, toFileText, type Eol } from '../markdown/eol';
 import { formatCommand, type FormatId } from '../markdown/format';
 import { livePreview, liveHooks, liveTheme } from '../markdown/livePreview/index.ts';
+import { isExternalUrl } from '../markdown/urls';
 
 interface Props {
   /** Current buffer contents (the draft). */
@@ -350,7 +351,11 @@ export function Editor({
           liveHooks.of({
             resolveImage: (src) =>
               resolveImageRef.current ? resolveImageRef.current(src) : Promise.reject(new Error('No image source')),
-            openLink: (href) => onNavigateRef.current?.(href),
+            openLink: (href) => {
+              if (href.startsWith('#')) return;
+              if (isExternalUrl(href)) window.open(href, '_blank', 'noopener,noreferrer');
+              else onNavigateRef.current?.(href);
+            },
             coarsePointer: () => window.matchMedia?.('(pointer: coarse)').matches ?? false,
           }),
           EditorView.lineWrapping,

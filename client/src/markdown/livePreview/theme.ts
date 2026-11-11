@@ -40,6 +40,40 @@ export const liveTheme = EditorView.theme({
   '.cm-lp-strong': { fontWeight: '700' },
   '.cm-lp-em': { fontStyle: 'italic' },
   '.cm-lp-strike': { textDecoration: 'line-through' },
+  '.cm-lp-link': {
+    color: 'var(--link)',
+    textDecoration: 'underline',
+    textUnderlineOffset: '2px',
+  },
+  '.cm-lp-link-internal': { textDecorationStyle: 'dashed' },
+  '.cm-lp-ordered': { color: 'var(--text-secondary)' },
+  '.cm-lp-bullet': {
+    display: 'inline-block',
+    minWidth: '0.8em',
+    color: 'var(--text-secondary)',
+  },
+  '.cm-lp-task': {
+    margin: '0 0.35em 0 0',
+    verticalAlign: 'middle',
+    accentColor: 'var(--accent)',
+    cursor: 'pointer',
+  },
+  '.cm-line.cm-lp-quote': {
+    borderLeft: '3px solid var(--accent)',
+    paddingLeft: '1em',
+    color: 'var(--text-secondary)',
+  },
+  '.cm-lp-rule': {
+    display: 'inline-block',
+    width: '100%',
+    verticalAlign: 'middle',
+    borderTop: '1px solid var(--border)',
+  },
+  '.cm-lp-html': {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.88em',
+    color: 'var(--text-tertiary)',
+  },
   '.cm-lp-code': {
     fontFamily: 'var(--font-mono)',
     fontSize: '0.88em',
