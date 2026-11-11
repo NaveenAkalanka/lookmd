@@ -792,9 +792,7 @@ export function App() {
       const path = pane === 'primary' ? activePath : secondaryPath;
       if (!path) return [];
       const m = effectiveMode(path, pane === 'primary' ? mode : secondaryMode);
-      const ed = (pane === 'primary' ? editing : secondaryEditing) && canWrite;
-      const shown = ed && m === 'read' ? 'split' : m;
-      return shown === 'read' ? ['read'] : shown === 'source' ? ['source'] : ['splitEditor', 'splitPreview'];
+      return m === 'read' ? ['read'] : m === 'source' ? ['source'] : ['splitEditor', 'splitPreview'];
     };
     const handler = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey) return;

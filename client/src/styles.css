@@ -1879,7 +1879,8 @@ body.resizing-col .sidebar {
 .editor {
   height: 100%;
 }
-.editor-no-gutter .cm-gutters {
+.editor-no-gutter .cm-gutters,
+.editor-live .cm-gutters {
   display: none;
 }
 

@@ -1,6 +1,11 @@
 /**
- * The Markdown editor (Source with Edit on, and the editing side of Split): a
- * thin CodeMirror 6 integration.
+ * The Markdown editor (any view with Edit on): a thin CodeMirror 6 integration.
+ *
+ * Two looks on one EditorView: `variant="source"` is the raw editor (Source and
+ * Split's editing side); `variant="live"` is the live preview inside Read, which
+ * renders Markdown everywhere except the lines the cursor touches. The variant
+ * lives in a Compartment, so switching Read ⇄ Source keeps the cursor, scroll
+ * position and undo history.
  *
  * The view is created once and kept across renders; we only push new content
  * when the *file identity* (`docKey`) changes, so typing never tears down the
@@ -17,8 +22,8 @@
 import { useEffect, useRef } from 'react';
 import { basicSetup } from 'codemirror';
 import { EditorView, keymap } from '@codemirror/view';
-import { Annotation, EditorState, Prec } from '@codemirror/state';
-import { markdown } from '@codemirror/lang-markdown';
+import { Annotation, Compartment, EditorState, Prec, type Extension } from '@codemirror/state';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { undo, redo } from '@codemirror/commands';
 import { openSearchPanel } from '@codemirror/search';
@@ -26,6 +31,7 @@ import { tags as t } from '@lezer/highlight';
 import type { EditorApi } from '../editorApi';
 import { detectEol, toFileText, type Eol } from '../markdown/eol';
 import { formatCommand, type FormatId } from '../markdown/format';
+import { livePreview, liveHooks, liveTheme } from '../markdown/livePreview/index.ts';
 
 interface Props {
   /** Current buffer contents (the draft). */
@@ -45,6 +51,12 @@ interface Props {
   reveal?: { line: number; nonce: number };
   /** This editor's command API on mount, null on unmount (for its pane's toolbar). */
   onApi?: (api: EditorApi | null) => void;
+  /** 'source' = raw editor (default); 'live' = live preview inside Read. */
+  variant?: 'source' | 'live';
+  /** Resolve an image src through the file source (live preview images). */
+  resolveImage?: (src: string) => Promise<string>;
+  /** Open an internal link (live preview Ctrl/Cmd-click). */
+  onNavigate?: (href: string) => void;
 }
 
 /** A CodeMirror theme whose every value points at a lookmd CSS variable. */
@@ -155,7 +167,7 @@ const themeFromTokens = EditorView.theme({
  * style replaces it wholesale. Tags cover both Markdown structure (headings,
  * emphasis, links, lists) and the code embedded in fenced blocks.
  */
-const lookmdHighlightStyle = HighlightStyle.define([
+const codeHighlights = [
   { tag: [t.keyword, t.moduleKeyword, t.controlKeyword, t.definitionKeyword, t.operatorKeyword], color: 'var(--syntax-keyword)' },
   { tag: [t.string, t.docString], color: 'var(--syntax-string)' },
   { tag: [t.regexp], color: 'var(--syntax-regex)' },
@@ -174,6 +186,9 @@ const lookmdHighlightStyle = HighlightStyle.define([
   { tag: [t.punctuation, t.separator, t.bracket, t.brace, t.paren, t.squareBracket], color: 'var(--syntax-punctuation)' },
   { tag: [t.propertyName, t.attributeName, t.definition(t.propertyName)], color: 'var(--syntax-property)' },
   { tag: [t.tagName, t.angleBracket, t.attributeValue], color: 'var(--syntax-tag)' },
+  { tag: t.invalid, color: 'var(--danger)' },
+];
+const markdownHighlights = [
   { tag: [t.heading, t.heading1, t.heading2, t.heading3, t.heading4, t.heading5, t.heading6], color: 'var(--syntax-heading)', fontWeight: 'bold' },
   { tag: [t.link, t.url], color: 'var(--syntax-link)', textDecoration: 'underline' },
   { tag: t.strong, fontWeight: 'bold', color: 'var(--text-primary)' },
@@ -181,8 +196,16 @@ const lookmdHighlightStyle = HighlightStyle.define([
   { tag: t.strikethrough, textDecoration: 'line-through' },
   { tag: [t.list, t.quote], color: 'var(--syntax-punctuation)' },
   { tag: [t.monospace, t.literal], color: 'var(--syntax-string)' },
-  { tag: t.invalid, color: 'var(--danger)' },
-]);
+];
+const lookmdHighlightStyle = HighlightStyle.define([...codeHighlights, ...markdownHighlights]);
+const liveHighlightStyle = HighlightStyle.define(codeHighlights);
+
+/** The extensions that differ between the two looks. */
+function variantExtensions(variant: 'source' | 'live'): Extension {
+  return variant === 'live'
+    ? [syntaxHighlighting(liveHighlightStyle), livePreview(), liveTheme]
+    : syntaxHighlighting(lookmdHighlightStyle);
+}
 
 /** Marks the programmatic document swap on file switch, which is a load, not
  *  an edit — it must not be reported as a draft change. */
@@ -198,6 +221,9 @@ export function Editor({
   onReleaseApi,
   reveal,
   onApi,
+  variant = 'source',
+  resolveImage,
+  onNavigate,
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -214,6 +240,14 @@ export function Editor({
   onFocusApiRef.current = onFocusApi;
   const onApiRef = useRef(onApi);
   onApiRef.current = onApi;
+  const resolveImageRef = useRef(resolveImage);
+  resolveImageRef.current = resolveImage;
+  const onNavigateRef = useRef(onNavigate);
+  onNavigateRef.current = onNavigate;
+  const variantRef = useRef(variant);
+  // One compartment per editor instance holds the variant's extensions.
+  const variantSlot = useRef<Compartment | null>(null);
+  if (!variantSlot.current) variantSlot.current = new Compartment();
   // Line ending of the loaded file; reset whenever a new document is loaded.
   const eolRef = useRef<Eol>(detectEol(value));
 
@@ -310,9 +344,15 @@ export function Editor({
         extensions: [
           saveKeymap,
           basicSetup,
-          markdown(),
-          syntaxHighlighting(lookmdHighlightStyle),
+          markdown({ base: markdownLanguage }),
           themeFromTokens,
+          variantSlot.current!.of(variantExtensions(variantRef.current)),
+          liveHooks.of({
+            resolveImage: (src) =>
+              resolveImageRef.current ? resolveImageRef.current(src) : Promise.reject(new Error('No image source')),
+            openLink: (href) => onNavigateRef.current?.(href),
+            coarsePointer: () => window.matchMedia?.('(pointer: coarse)').matches ?? false,
+          }),
           EditorView.lineWrapping,
           EditorView.updateListener.of((update) => {
             const isLoad = update.transactions.some((tr) => tr.annotation(documentLoad));
@@ -339,6 +379,14 @@ export function Editor({
       viewRef.current = null;
     };
   }, [onReleaseApi]);
+
+  // Switch the look in place (same view: cursor, scroll and undo survive).
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || variantRef.current === variant) return;
+    variantRef.current = variant;
+    view.dispatch({ effects: variantSlot.current!.reconfigure(variantExtensions(variant)) });
+  }, [variant]);
 
   // Replace the document when a different file is opened. We compare identity
   // (docKey), not content, so a save that returns the same text won't reset the
@@ -375,5 +423,6 @@ export function Editor({
 
   // basicSetup always renders the gutter; hide it with a class when disabled,
   // so toggling never tears down the editor or resets the cursor.
-  return <div className={`editor${lineNumbers ? '' : ' editor-no-gutter'}`} ref={hostRef} />;
+  const cls = `editor${lineNumbers ? '' : ' editor-no-gutter'}${variant === 'live' ? ' editor-live' : ''}`;
+  return <div className={cls} ref={hostRef} />;
 }

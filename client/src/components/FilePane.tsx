@@ -5,9 +5,9 @@
  *
  * Edit is a toggle on top of the view, not a view of its own: Source + Edit is
  * the raw editor, Split + Edit puts the raw editor beside the rendered preview,
- * and Read + Edit falls back to that split until live preview lands. Source and
- * Split share one editor slot, so switching between them while editing keeps
- * the same editor (cursor, undo history) mounted. The app shell renders one pane normally and two when split, each bound
+ * and Read + Edit is the live preview (rendered, raw only on the cursor's
+ * lines). All three share one editor slot, so switching views while editing
+ * keeps the same editor (cursor, undo history) mounted. The app shell renders one pane normally and two when split, each bound
  * to its own tab, so two files can be viewed/edited side by side or stacked.
  *
  * The heavy rendering/highlighting stacks (react-markdown, highlight.js,
@@ -143,11 +143,17 @@ export function FilePane({
   // The mounted editor's command API, for this pane's toolbar.
   const [paneApi, setPaneApi] = useState<EditorApi | null>(null);
 
-  // What actually renders. Read + Edit shows the split (editor | preview)
-  // until live preview inside Read exists.
+  // What renders: with Edit on every view has the editor; in Read it is the
+  // live preview (same editor slot, live look).
   const editOn = editing && canWrite;
-  const shown: ViewMode = editOn && mode === 'read' ? 'split' : mode;
-  const editorShown = editOn && (shown === 'source' || shown === 'split');
+  const shown: ViewMode = mode;
+  const editorShown = editOn;
+  const live = editOn && mode === 'read';
+  // Read view without the editor: the react-markdown page.
+  const readPage = shown === 'read' && !live;
+  // The editor slot's zoom side.
+  const editorSlot: ZoomSlot = live ? 'read' : shown === 'split' ? 'splitEditor' : 'source';
+  const editorSlotLabel = live ? 'Read' : shown === 'split' ? 'Editor' : 'Source';
 
   // The overlay is offered on the single-column views (not a split).
   const annotatable = shown === 'read' || shown === 'source';
@@ -360,34 +366,34 @@ export function FilePane({
       {tab.saveError && <div className="banner banner-error">{tab.saveError}</div>}
 
       <div
-        className={`pane-body${shown === 'read' ? ' zoom-host' : ''}${overlayOn ? ' annotate-active' : ''}${overlayOn && editorShown ? ' annotate-locked' : ''}`}
-        onPointerEnter={shown === 'read' ? () => onZoomTarget('read') : undefined}
-        onPointerDownCapture={shown === 'read' ? () => onZoomTarget('read') : undefined}
+        className={`pane-body${readPage ? ' zoom-host' : ''}${overlayOn ? ' annotate-active' : ''}${overlayOn && editorShown ? ' annotate-locked' : ''}`}
+        onPointerEnter={readPage ? () => onZoomTarget('read') : undefined}
+        onPointerDownCapture={readPage ? () => onZoomTarget('read') : undefined}
       >
       <div
         className="view"
         ref={viewRef}
-        style={shown === 'read' ? ({ '--zoom': zoom.read } as React.CSSProperties) : undefined}
+        style={readPage ? ({ '--zoom': zoom.read } as React.CSSProperties) : undefined}
       >
         {tab.loading && <div className="placeholder">Loading {tab.path}…</div>}
         {tab.error && <div className="placeholder error">{tab.error}</div>}
         {tab.content !== null && !tab.loading && !tab.error && (
           <Suspense fallback={<div className="placeholder">Loading…</div>}>
-            {shown === 'read' && (
+            {readPage && (
               <ReadView content={tab.draft} resolveImage={resolveImage} onNavigate={onNavigate} />
             )}
-            {(shown === 'source' || shown === 'split') && (
+            {!readPage && (
               <div className={`split${shown === 'split' ? '' : ' split-single'}`}>
                 {/* Always the first child, so the editor stays mounted when the
                     preview column comes and goes. */}
                 <div
                   className="split-pane split-editor zoom-host"
                   style={{
-                    '--zoom': shown === 'split' ? zoom.splitEditor : zoom.source,
+                    '--zoom': zoom[editorSlot],
                     ...(shown === 'split' ? { flex: `0 0 ${splitRatio * 100}%` } : {}),
                   } as React.CSSProperties}
-                  onPointerEnter={() => onZoomTarget(shown === 'split' ? 'splitEditor' : 'source')}
-                  onPointerDownCapture={() => onZoomTarget(shown === 'split' ? 'splitEditor' : 'source')}
+                  onPointerEnter={() => onZoomTarget(editorSlot)}
+                  onPointerDownCapture={() => onZoomTarget(editorSlot)}
                 >
                   <div className="split-scroll">
                     {editorShown ? (
@@ -401,17 +407,20 @@ export function FilePane({
                         onReleaseApi={onEditorReleaseApi}
                         reveal={reveal}
                         onApi={setPaneApi}
+                        variant={live ? 'live' : 'source'}
+                        resolveImage={resolveImage}
+                        onNavigate={onNavigate}
                       />
                     ) : (
                       <SourceView content={tab.draft} lineNumbers={lineNumbers} />
                     )}
                   </div>
                   <ZoomPill
-                    zoom={shown === 'split' ? zoom.splitEditor : zoom.source}
-                    label={shown === 'split' ? 'Editor' : 'Source'}
-                    onIn={() => onZoom(shown === 'split' ? 'splitEditor' : 'source', 'in')}
-                    onOut={() => onZoom(shown === 'split' ? 'splitEditor' : 'source', 'out')}
-                    onReset={() => onZoom(shown === 'split' ? 'splitEditor' : 'source', 'reset')}
+                    zoom={zoom[editorSlot]}
+                    label={editorSlotLabel}
+                    onIn={() => onZoom(editorSlot, 'in')}
+                    onOut={() => onZoom(editorSlot, 'out')}
+                    onReset={() => onZoom(editorSlot, 'reset')}
                   />
                 </div>
                 {shown === 'split' && (
@@ -446,7 +455,7 @@ export function FilePane({
           </Suspense>
         )}
       </div>
-        {shown === 'read' && tab.content !== null && !tab.loading && !tab.error && (
+        {readPage && tab.content !== null && !tab.loading && !tab.error && (
           <ZoomPill
             zoom={zoom.read}
             label="Read"
