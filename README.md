@@ -34,15 +34,33 @@ all rendering happens in the browser. Your `.md` files are touched only when
 ## Features
 
 ### Reading & editing
-- **Three modes per file** — **Read** (rendered), **Source** (raw, read-only),
-  and **Edit** (CodeMirror 6) — one segmented toggle switches between them, plus
-  an optional **split** view.
+- **Three views + an Edit toggle** — **Read** (rendered), **Source** (raw) and
+  **Split** (raw | rendered side by side). **Edit** (`Ctrl/Cmd-E`) makes the
+  *current* view editable instead of being a view of its own.
+- **Live preview** — Read with Edit on is an Obsidian-style editor: you type
+  in the rendered page, and the raw Markdown appears only on the lines your
+  cursor touches. Headings, emphasis, links and `[[wiki-links]]`, lists and
+  task checkboxes (click to tick), quotes, rules, images, badges, syntax-
+  highlighted code blocks and GFM tables all render in place. Raw HTML and
+  front matter stay raw. Saves stay byte-for-byte: the preview only decorates
+  the text and never rewrites it.
+- **Opening links while editing** — `Ctrl`-click (`Cmd`-click on macOS) opens
+  a link; a plain click edits it. On touch screens, tapping a link shows an
+  **Open link** chip. Only `http(s)`, `mailto` and workspace links open;
+  `javascript:` and similar links are ignored.
+- **Formatting toolbar and shortcuts** — bold, italic, links (`Ctrl/Cmd-B/I/K`),
+  headings, lists, tasks, quotes, tables, code blocks, and undo/redo.
 - **Rich Markdown** — GFM tables, task lists, autolinks, `[[wiki-links]]`,
-  inline images, heading anchors, and an **outline** for quick navigation.
-- **Rich code blocks** in Read — language badge, one-click copy, and line
-  numbers, with deep, multi-token **syntax highlighting** that recolors per theme.
-- **Content zoom** — scale the reading/editing surface in or out
-  (`Ctrl/Cmd +/-/0`), remembered per browser.
+  inline images, heading anchors, and an **outline** that jumps to a heading in
+  the page or, while editing, in the editor.
+- **Rich code blocks** — language badge, one-click copy and **syntax
+  highlighting** that recolors per theme, in Read, in Source and in the live
+  preview.
+- **Resizable layout** — drag the dividers between Split's editor and preview
+  and between two side-by-side files.
+- **Zoom per view** — every view (and each side of Split) has its own zoom
+  level, set with a corner control or `Ctrl/Cmd +/-/0` and remembered per
+  browser.
 
 ### Annotate (temporary marking overlay)
 - A toggleable **vector overlay** to draw over any file without changing it:
@@ -68,12 +86,28 @@ all rendering happens in the browser. Your `.md` files are touched only when
   Light, Ayu Light, Sepia, Snow, …) and **17 dark** (Slate, Nord, Dracula, Tokyo
   Night, Carbon/OLED, Abyss, Noir, …), every value token-driven so themes swap
   data, not components.
+- **Quick theme switcher** — the palette button in the top bar lists every
+  theme with a swatch in its own colors; one click applies and saves it. It
+  works from the keyboard too (arrows, Enter, Escape).
 - **Configurable fonts** for reading and editor/mono slots, with curated choices
   plus a custom field.
 - **Smooth, restrained motion** — short, eased transitions that respect
   `prefers-reduced-motion`.
 - **File-type toggles** — choose which file types appear in the tree (Markdown
   always shown).
+
+### Keyboard shortcuts
+
+| Keys (`Cmd` on macOS)    | Action                                   |
+| ------------------------ | ---------------------------------------- |
+| `Ctrl-S`                 | Save                                     |
+| `Ctrl-E`                 | Toggle Edit for the focused pane         |
+| `Ctrl-B` / `I` / `K`     | Bold / italic / link (while editing)     |
+| `Ctrl-Click`             | Open a link (while editing)              |
+| `Ctrl-F`, `Ctrl-H`       | Find / replace in the file               |
+| `Ctrl-Shift-F`           | Find in files                            |
+| `Ctrl-B` (not editing)   | Toggle the sidebar                       |
+| `Ctrl +` / `-` / `0`     | Zoom the view under the pointer          |
 
 ## Requirements
 
