@@ -2759,6 +2759,59 @@ body.resizing-col .sidebar {
   background: var(--border);
 }
 
+/* --- Topbar theme switcher ---------------------------------------------- */
+/* Sits at the right of the topbar, so its menu opens right-aligned; long list
+   scrolls within the window. */
+.theme-menu {
+  left: auto;
+  right: 0;
+  min-width: 220px;
+  max-height: min(70vh, calc(100dvh - var(--topbar-height) - 16px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.theme-menu-group {
+  padding: 8px 10px 4px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.theme-menu-item {
+  gap: 10px;
+  padding-block: 6px;
+}
+.theme-menu-item[aria-checked='true'] {
+  color: var(--accent);
+}
+.theme-menu-item:focus-visible,
+.theme-menu-more:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+/* The swatch carries its own data-theme, so these tokens are that theme's. */
+.theme-swatch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--background);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.theme-swatch-accent {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 9px;
+  height: 9px;
+  border-top-left-radius: 9px;
+  background: var(--accent);
+}
+
 /* --- Right-click context menu ------------------------------------------- */
 .context-menu {
   position: fixed;
@@ -3667,5 +3720,14 @@ body.resizing-row {
   }
   .file-bar .segmented-item {
     padding: 5px 9px;
+  }
+}
+
+/* Smallest phones (≤360px): the topbar holds six controls, so tighten the gaps
+   rather than hide one. */
+@media (max-width: 360px) {
+  .topbar {
+    gap: 4px;
+    padding: 0 6px;
   }
 }

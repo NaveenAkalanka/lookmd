@@ -57,6 +57,7 @@ import { WorkspaceSearch, type SearchRequest } from './components/WorkspaceSearc
 import { ActivityBar } from './components/ActivityBar';
 import { Divider } from './components/Divider';
 import { ContextMenu, type ContextMenuState, type MenuEntry } from './components/ContextMenu';
+import { ThemeMenu } from './components/ThemeMenu';
 import { type Tab, newTab, tabDirty } from './tab';
 import type { EditorApi } from './editorApi';
 import { type ViewMode } from './components/ModeToggle';
@@ -1229,6 +1230,7 @@ export function App() {
         <span className="workspace-name" title={workspace.root || '/'}>
           {workspace.name}
         </span>
+        <ThemeMenu theme={theme} onTheme={changeTheme} onMore={() => setSettingsOpen(true)} />
         <button
           className="btn change-workspace"
           title="Change workspace"
