@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildBlocks } from './blocks.ts';
+import { blocksFor, buildBlocks } from './blocks.ts';
 import { buildInline } from './inline.ts';
 import { revealedLines } from './reveal.ts';
 import { stateOf, summarize } from './testUtil.ts';
@@ -138,5 +138,14 @@ describe('front matter', () => {
       'line cm-lp-fm L2',
       'line cm-lp-fm L3',
     ]);
+  });
+});
+
+describe('blocksFor cache (review #3)', () => {
+  it('returns the same set when tree, reveal and heights are unchanged', () => {
+    const state = stateOf('| a |\n|---|\n| 1 |\n\n‸');
+    const reveal = revealedLines(state);
+    const heights = new Map<string, number>();
+    assert.equal(blocksFor(state, reveal, heights), blocksFor(state, reveal, heights));
   });
 });

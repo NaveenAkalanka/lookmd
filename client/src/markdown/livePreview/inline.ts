@@ -70,14 +70,19 @@ export function buildInline(
   const atomic: Range<Decoration>[] = [];
   const seen = new Set<string>();
 
+  // CodeMirror rejects view-plugin replacements that cross a line break; a
+  // construct spanning lines (wrapped image alt, link url on the next line) is
+  // left raw instead. This guard is the backstop for any such range.
+  const oneLine = (from: number, to: number) => to <= doc.lineAt(from).to;
   const hide = (from: number, to: number) => {
-    if (to > from) {
+    if (to > from && oneLine(from, to)) {
       const r = HIDE.range(from, to);
       out.push(r);
       atomic.push(r);
     }
   };
   const replace = (deco: Decoration, from: number, to: number) => {
+    if (!oneLine(from, to)) return;
     const r = deco.range(from, to);
     out.push(r);
     atomic.push(r);
@@ -179,7 +184,7 @@ export function buildInline(
           const open = marks[0];
           const close = marks[1];
           if (!url || !open || !close) return;
-          if (revealed(ref.from, ref.to)) return false;
+          if (revealed(ref.from, ref.to) || !oneLine(ref.from, ref.to)) return false;
           hide(ref.from, open.to);
           mark(linkClass(doc.sliceString(url.from, url.to)), open.to, close.from);
           hide(close.from, ref.to);
@@ -207,7 +212,7 @@ export function buildInline(
         // off the cursor line, and an image-only line collapses.
         if (name === 'Image') {
           const line = doc.lineAt(ref.from);
-          if (reveal.has(line.number) || !ref.node.getChild('URL')) return false;
+          if (revealed(ref.from, ref.to) || !oneLine(ref.from, ref.to) || !ref.node.getChild('URL')) return false;
           hide(ref.from, ref.to);
           const list = imageLines.get(line.number) ?? [];
           list.push([ref.from - line.from, ref.to - line.from]);

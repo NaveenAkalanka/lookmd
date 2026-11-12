@@ -17,6 +17,9 @@ import { frontMatterRange, touchesReveal } from './reveal.ts';
 import { CodeHeadWidget, ImageWidget, TableWidget } from './widgets.ts';
 import { parseTable } from './table.ts';
 
+/** Inline-only containers: worth entering only if they can hold an image. */
+const INLINE_CONTAINERS = /^(Paragraph|ATXHeading\d|SetextHeading\d)$/;
+
 /** Nodes that never hold an image (skipped entirely). */
 const SKIP = new Set(['CodeBlock', 'HTMLBlock', 'CommentBlock', 'InlineCode', 'HTMLTag', 'Comment']);
 
@@ -32,6 +35,35 @@ export function imageParts(state: EditorState, from: number, to: number, url: { 
   const close = marks[1];
   const alt = open && close ? state.sliceDoc(open.to, close.from) : '';
   return { src: url ? state.sliceDoc(url.from, url.to) : '', alt, from, to };
+}
+
+let last: {
+  doc: unknown;
+  tree: unknown;
+  reveal: Set<number>;
+  heights: ReadonlyMap<string, number>;
+  result: DecorationSet;
+} | null = null;
+
+/**
+ * `buildBlocks`, but returning the previous set when the document, syntax tree,
+ * revealed lines and image heights are all the same objects as last time —
+ * e.g. for transactions that only carry unrelated effects (search panel,
+ * parser bookkeeping). The cache holds one entry; another editor's state
+ * simply misses it.
+ */
+export function blocksFor(
+  state: EditorState,
+  reveal: Set<number>,
+  heights: ReadonlyMap<string, number>,
+): DecorationSet {
+  const tree = syntaxTree(state);
+  if (last && last.doc === state.doc && last.tree === tree && last.reveal === reveal && last.heights === heights) {
+    return last.result;
+  }
+  const result = buildBlocks(state, reveal, heights);
+  last = { doc: state.doc, tree, reveal, heights, result };
+  return result;
 }
 
 export function buildBlocks(
@@ -52,6 +84,7 @@ export function buildBlocks(
       if (ref.name === 'Document') return;
       if (fm && ref.from < fm.to) return false;
       if (SKIP.has(ref.name)) return false;
+      if (INLINE_CONTAINERS.test(ref.name) && !doc.sliceString(ref.from, ref.to).includes('![')) return false;
 
       if (ref.name === 'FencedCode') {
         const fences = ref.node.getChildren('CodeMark');

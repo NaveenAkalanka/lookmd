@@ -149,3 +149,32 @@ describe('buildInline: lists, quotes, rules, HTML', () => {
     assert.deepEqual(summarize(atomic, state), ['widget task 0-5']);
   });
 });
+
+describe('buildInline: constructs spanning lines (review #1)', () => {
+  /** CodeMirror rejects plugin replacements that cross a line break. */
+  function crossing(marked: string): string[] {
+    const { state, decorations } = build(marked);
+    const bad: string[] = [];
+    decorations.between(0, state.doc.length, (from, to, v) => {
+      const point = !(v.spec as { class?: string }).class || (v.spec as { widget?: unknown }).widget;
+      if (point && to > state.doc.lineAt(from).to) bad.push(`${from}-${to}`);
+    });
+    return bad;
+  }
+
+  it('a multi-line image alt stays raw (cursor on its second line)', () => {
+    assert.deepEqual(crossing('![A long caption\nwraps‸](fig.png)'), []);
+    assert.deepEqual(all('![A long caption\nwraps](fig.png)\n\n‸'), []);
+  });
+
+  it('a link whose url or title is on the next line stays raw', () => {
+    assert.deepEqual(crossing('[t](\nu.md)\n\n‸'), []);
+    assert.deepEqual(crossing('[t](u.md\n"ti")\n\n‸'), []);
+  });
+
+  it('no hidden or widget range ever crosses a line', () => {
+    for (const doc of ['**a\nb**\n\n‸', '[a\nb](c.md)\n\n‸', '<span\nclass="x">y</span>\n\n‸', '~~a\nb~~\n\n‸', '`a\nb`\n\n‸']) {
+      assert.deepEqual(crossing(doc), [], doc);
+    }
+  });
+});

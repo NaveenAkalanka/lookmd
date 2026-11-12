@@ -13,7 +13,7 @@ import { syntaxTree } from '@codemirror/language';
 import { buildInline } from './inline.ts';
 import { revealField } from './reveal.ts';
 import { linkAt } from './links.ts';
-import { buildBlocks } from './blocks.ts';
+import { blocksFor } from './blocks.ts';
 import { imageHeights, liveHooks } from './hooks.ts';
 
 export { liveHooks, type LiveHooks } from './hooks.ts';
@@ -30,7 +30,7 @@ const parseTick = StateField.define<number>({
 
 /** Block decorations (images, …) must come from state, not a plugin. */
 const blockDecorations = EditorView.decorations.compute(['doc', revealField, parseTick, imageHeights], (state) =>
-  buildBlocks(state, state.field(revealField), state.field(imageHeights)),
+  blocksFor(state, state.field(revealField), state.field(imageHeights)),
 );
 
 /** The revealed lines, plus the line an IME composition is active on. */

@@ -29,7 +29,14 @@ export function revealedLines(state: EditorState, composingLine?: number | null)
 /** The editor's revealed lines (selection only; composition is added by the view). */
 export const revealField = StateField.define<Set<number>>({
   create: (state) => linesOf(state.doc, state.selection),
-  update: (value, tr) => (tr.docChanged || tr.selection ? linesOf(tr.newDoc, tr.newSelection) : value),
+  update(value, tr) {
+    if (!tr.docChanged && !tr.selection) return value;
+    const next = linesOf(tr.newDoc, tr.newSelection);
+    // Same lines (cursor moved within them): keep the identical set, so the
+    // block decorations that depend on it aren't rebuilt.
+    if (next.size === value.size && [...next].every((l) => value.has(l))) return value;
+    return next;
+  },
 });
 
 /** True when any line from `from` to `to` is revealed. */

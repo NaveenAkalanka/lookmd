@@ -52,3 +52,11 @@ describe('revealField', () => {
     assert.equal(s.update({}).state.field(revealField), s.field(revealField));
   });
 });
+
+describe('revealField identity (review #3)', () => {
+  it('moving within the same line keeps the same set (no block rebuild)', () => {
+    const s = EditorState.create({ doc: 'abc\ndef', selection: { anchor: 0 }, extensions: [revealField] });
+    const moved = s.update({ selection: { anchor: 2 } }).state;
+    assert.equal(moved.field(revealField), s.field(revealField));
+  });
+});
