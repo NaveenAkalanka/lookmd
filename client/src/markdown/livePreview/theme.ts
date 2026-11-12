@@ -82,6 +82,13 @@ export const liveTheme = EditorView.theme({
     maxWidth: '100%',
     height: 'auto',
   },
+  // Badges: images inside links, inline in the text.
+  '.cm-lp-image-inline img': {
+    display: 'inline-block',
+    height: '1.25em',
+    width: 'auto',
+    verticalAlign: 'middle',
+  },
   '.cm-lp-code': {
     fontFamily: 'var(--font-mono)',
     fontSize: '0.88em',

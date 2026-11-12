@@ -69,6 +69,47 @@ export class RuleWidget extends WidgetType {
   }
 }
 
+/** While an image's src is being typed, wait this long before loading it. */
+const EDIT_LOAD_DELAY = 400;
+const LOAD_TIMERS = new WeakMap<HTMLElement, number>();
+
+/**
+ * An image inside a link (a README badge): rendered inline in the link text.
+ * Events go to the editor, so Ctrl/Cmd-click opens the link around it.
+ */
+export class InlineImageWidget extends WidgetType {
+  readonly kind = 'inline-image';
+  readonly src: string;
+  readonly alt: string;
+  constructor(src: string, alt: string) {
+    super();
+    this.src = src;
+    this.alt = alt;
+  }
+  override eq(other: WidgetType): boolean {
+    return other instanceof InlineImageWidget && other.src === this.src && other.alt === this.alt;
+  }
+  toDOM(view: EditorView): HTMLElement {
+    const el = document.createElement('span');
+    el.className = 'cm-lp-image-inline';
+    el.textContent = this.alt;
+    view.state
+      .facet(liveHooks)
+      .resolveImage(this.src)
+      .then((url) => {
+        const img = document.createElement('img');
+        img.alt = this.alt;
+        img.onerror = () => el.replaceChildren(this.alt || this.src);
+        img.src = url;
+        el.replaceChildren(img);
+      }, () => el.replaceChildren(this.alt || this.src));
+    return el;
+  }
+  override ignoreEvent(): boolean {
+    return false;
+  }
+}
+
 /**
  * An image below its line, loaded through the file source (`liveHooks`), with
  * the Read view's loading placeholder and "image not found" chip classes.
@@ -79,11 +120,14 @@ export class ImageWidget extends WidgetType {
   readonly alt: string;
   /** Rendered height once known (see `imageMeasured`), else null. */
   readonly height: number | null;
-  constructor(src: string, alt: string, height: number | null = null) {
+  /** The src is being edited: wait before loading (not part of `eq`). */
+  readonly deferred: boolean;
+  constructor(src: string, alt: string, height: number | null = null, deferred = false) {
     super();
     this.src = src;
     this.alt = alt;
     this.height = height;
+    this.deferred = deferred;
   }
   override eq(other: WidgetType): boolean {
     return other instanceof ImageWidget && other.src === this.src && other.alt === this.alt && other.height === this.height;
@@ -113,19 +157,30 @@ export class ImageWidget extends WidgetType {
       wrap.replaceChildren(chip);
       report();
     };
-    view.state
-      .facet(liveHooks)
-      .resolveImage(this.src)
-      .then((url) => {
-        const img = document.createElement('img');
-        img.alt = this.alt;
-        img.onerror = fail;
-        // The image's height arrives late; report it so the editor re-measures.
-        img.onload = report;
-        img.src = url;
-        wrap.replaceChildren(img);
-      }, fail);
+    const load = () => {
+      LOAD_TIMERS.delete(wrap);
+      if (!wrap.isConnected && this.deferred) return; // replaced while waiting
+      view.state
+        .facet(liveHooks)
+        .resolveImage(this.src)
+        .then((url) => {
+          const img = document.createElement('img');
+          img.alt = this.alt;
+          img.onerror = fail;
+          // The image's height arrives late; report it so the editor re-measures.
+          img.onload = report;
+          img.src = url;
+          wrap.replaceChildren(img);
+        }, fail);
+    };
+    if (this.deferred) LOAD_TIMERS.set(wrap, window.setTimeout(load, EDIT_LOAD_DELAY));
+    else load();
     return wrap;
+  }
+  override destroy(dom: HTMLElement): void {
+    const timer = LOAD_TIMERS.get(dom);
+    if (timer !== undefined) window.clearTimeout(timer);
+    LOAD_TIMERS.delete(dom);
   }
   override get estimatedHeight(): number {
     return this.height ?? 120;

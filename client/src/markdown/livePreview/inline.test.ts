@@ -57,13 +57,6 @@ describe('buildInline: emphasis and code', () => {
 });
 
 describe('buildInline: invariants', () => {
-  it('atomic holds only the hidden ranges', () => {
-    const { state, atomic } = build('# T **b**\n‸');
-    const entries = summarize(atomic, state);
-    assert.ok(entries.length > 0);
-    assert.ok(entries.every((e) => e.startsWith('hide')), entries.join(', '));
-  });
-
   it('building never changes the document', () => {
     const text = '# T\n\n**b** `c`\n‸';
     const { state } = build(text);
@@ -144,10 +137,6 @@ describe('buildInline: lists, quotes, rules, HTML', () => {
     assert.deepEqual(all('<b>x</b>\n‸'), ['mark cm-lp-html 0-3', 'mark cm-lp-html 4-8']);
   });
 
-  it('widgets are atomic too', () => {
-    const { state, atomic } = build('- [ ] a\n‸');
-    assert.deepEqual(summarize(atomic, state), ['widget task 0-5']);
-  });
 });
 
 describe('buildInline: constructs spanning lines (review #1)', () => {
@@ -176,5 +165,26 @@ describe('buildInline: constructs spanning lines (review #1)', () => {
     for (const doc of ['**a\nb**\n\n‸', '[a\nb](c.md)\n\n‸', '<span\nclass="x">y</span>\n\n‸', '~~a\nb~~\n\n‸', '`a\nb`\n\n‸']) {
       assert.deepEqual(crossing(doc), [], doc);
     }
+  });
+});
+
+describe('buildInline: badges (images inside links)', () => {
+  it('render the image inline, inside the link text', () => {
+    assert.deepEqual(all('[![b](b.svg)](https://x.io)\n‸'), [
+      'hide 0-1',
+      'mark cm-lp-link 1-12',
+      'widget inline-image 1-12',
+      'hide 12-27',
+    ]);
+  });
+
+  it('a badge line is not collapsed like an image-only line', () => {
+    assert.ok(!all('[![b](b.svg)](https://x.io)\n‸').some((e) => e.includes('hidden-line')));
+  });
+
+  it('the result has no atomic set (any cursor line is raw anyway)', () => {
+    const { state } = build('# T\n‸');
+    const result = buildInline(state, revealedLines(state), [{ from: 0, to: state.doc.length }]);
+    assert.ok(!('atomic' in result));
   });
 });

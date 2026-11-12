@@ -4,8 +4,9 @@
  *
  * Hidden syntax is a `Decoration.replace` with no widget; styled text is a
  * `Decoration.mark` with a `cm-lp-*` class. Anything on a revealed line is left
- * raw. The returned `atomic` set holds only the hidden ranges, so the cursor
- * steps over them instead of landing inside invisible characters.
+ * raw — and every line any selection touches is revealed, so the cursor never
+ * sits inside hidden syntax. (That is why there are no atomic ranges: they only
+ * made a cursor arriving from another line skip the hidden end of this one.)
  */
 
 import type { EditorState, Range } from '@codemirror/state';
@@ -14,11 +15,10 @@ import { syntaxTree } from '@codemirror/language';
 import { frontMatterRange, touchesReveal } from './reveal.ts';
 import { inCodeOrHtml, wikiLinksIn } from './links.ts';
 import { isExternalUrl } from '../urls.ts';
-import { BulletWidget, RuleWidget, TaskWidget } from './widgets.ts';
+import { BulletWidget, InlineImageWidget, RuleWidget, TaskWidget } from './widgets.ts';
 
 export interface InlineDecorations {
   decorations: DecorationSet;
-  atomic: DecorationSet;
 }
 
 const HIDE = Decoration.replace({});
@@ -66,8 +66,6 @@ export function buildInline(
   const fm = frontMatterRange(state);
   const tree = syntaxTree(state);
   const out: Range<Decoration>[] = [];
-  // Replacements (hidden syntax and widgets): the cursor steps over these.
-  const atomic: Range<Decoration>[] = [];
   const seen = new Set<string>();
 
   // CodeMirror rejects view-plugin replacements that cross a line break; a
@@ -75,17 +73,10 @@ export function buildInline(
   // left raw instead. This guard is the backstop for any such range.
   const oneLine = (from: number, to: number) => to <= doc.lineAt(from).to;
   const hide = (from: number, to: number) => {
-    if (to > from && oneLine(from, to)) {
-      const r = HIDE.range(from, to);
-      out.push(r);
-      atomic.push(r);
-    }
+    if (to > from && oneLine(from, to)) out.push(HIDE.range(from, to));
   };
   const replace = (deco: Decoration, from: number, to: number) => {
-    if (!oneLine(from, to)) return;
-    const r = deco.range(from, to);
-    out.push(r);
-    atomic.push(r);
+    if (oneLine(from, to)) out.push(deco.range(from, to));
   };
   const mark = (cls: string, from: number, to: number) => {
     if (to > from) out.push(markOf(cls).range(from, to));
@@ -211,6 +202,16 @@ export function buildInline(
         // Images: the picture is a block widget (blocks.ts); the syntax hides
         // off the cursor line, and an image-only line collapses.
         if (name === 'Image') {
+          // A badge — an image inside a link — renders inline, inside the
+          // link text, so badge rows stay rows and Ctrl/Cmd-click opens the link.
+          if (ref.node.parent?.name === 'Link') {
+            const url = ref.node.getChild('URL');
+            const marks = ref.node.getChildren('LinkMark');
+            if (!url || revealed(ref.from, ref.to) || !oneLine(ref.from, ref.to)) return false;
+            const alt = marks[0] && marks[1] ? doc.sliceString(marks[0].to, marks[1].from) : '';
+            replace(Decoration.replace({ widget: new InlineImageWidget(doc.sliceString(url.from, url.to), alt) }), ref.from, ref.to);
+            return false;
+          }
           const line = doc.lineAt(ref.from);
           if (revealed(ref.from, ref.to) || !oneLine(ref.from, ref.to) || !ref.node.getChild('URL')) return false;
           hide(ref.from, ref.to);
@@ -272,6 +273,5 @@ export function buildInline(
 
   return {
     decorations: Decoration.set(out, true),
-    atomic: Decoration.set(atomic, true),
   };
 }

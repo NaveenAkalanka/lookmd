@@ -3,8 +3,9 @@
  * with a swatch drawn in its own colors (a scoped `data-theme`, so the swatch is
  * pure tokens like everything else). Picking applies immediately and persists.
  *
- * Keyboard: opening focuses the current theme; Up/Down/Home/End move; Enter or
- * Space picks; Escape closes and returns focus to the button.
+ * Keyboard: Down/Up on the button opens it; opening focuses the current theme
+ * (or the first); Up/Down/Home/End move; Enter or Space picks; Escape closes and
+ * returns focus to the button.
  */
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
@@ -48,7 +49,9 @@ export function ThemeMenu({ theme, onTheme, onMore }: Props) {
   // On open, focus (and scroll to) the current theme.
   useEffect(() => {
     if (!open) return;
-    const current = popRef.current?.querySelector<HTMLElement>('[aria-checked="true"]');
+    const current =
+      popRef.current?.querySelector<HTMLElement>('[aria-checked="true"]') ??
+      popRef.current?.querySelector<HTMLElement>('[role="menuitemradio"]');
     current?.focus({ preventScroll: true });
     current?.scrollIntoView({ block: 'nearest' });
   }, [open]);
@@ -88,6 +91,12 @@ export function ThemeMenu({ theme, onTheme, onMore }: Props) {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
       >
         <Icon icon={PaintBoardIcon} />
       </button>

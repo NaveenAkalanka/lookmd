@@ -1,8 +1,9 @@
 /**
  * The live-preview reveal rule: which lines show their raw Markdown.
  *
- * A line is revealed when any selection range touches it, or while an IME
- * composition is active on it (re-decorating a composing line mangles input).
+ * A line is revealed when any selection range touches it. That also guards IME
+ * composition (re-decorating a composing line would mangle input): composition
+ * happens at the selection, so its line is always revealed.
  * Block constructs (fenced code, tables, front matter) widen this to the whole
  * block; that is decided where the block is built, from these lines.
  */
@@ -20,10 +21,8 @@ function linesOf(doc: Text, selection: EditorSelection): Set<number> {
 }
 
 /** 1-based numbers of the lines touched by any selection range. */
-export function revealedLines(state: EditorState, composingLine?: number | null): Set<number> {
-  const lines = linesOf(state.doc, state.selection);
-  if (composingLine != null) lines.add(composingLine);
-  return lines;
+export function revealedLines(state: EditorState): Set<number> {
+  return linesOf(state.doc, state.selection);
 }
 
 /** The editor's revealed lines (selection only; composition is added by the view). */

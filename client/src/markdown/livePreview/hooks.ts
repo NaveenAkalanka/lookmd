@@ -11,6 +11,8 @@ import { Facet, StateEffect, StateField } from '@codemirror/state';
  */
 export const imageMeasured = StateEffect.define<{ src: string; height: number }>();
 
+const IMAGE_HEIGHTS_MAX = 200;
+
 export const imageHeights = StateField.define<ReadonlyMap<string, number>>({
   create: () => new Map(),
   update(map, tr) {
@@ -18,8 +20,12 @@ export const imageHeights = StateField.define<ReadonlyMap<string, number>>({
     for (const e of tr.effects) {
       if (!e.is(imageMeasured) || map.get(e.value.src) === e.value.height) continue;
       next ??= new Map(map);
+      next.delete(e.value.src); // re-insert as newest
       next.set(e.value.src, e.value.height);
     }
+    // Bounded: oldest entries go first (partial srcs typed while editing, files
+    // long closed).
+    while (next && next.size > IMAGE_HEIGHTS_MAX) next.delete(next.keys().next().value as string);
     return next ?? map;
   },
 });

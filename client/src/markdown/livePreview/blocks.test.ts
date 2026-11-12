@@ -6,6 +6,8 @@ import { buildInline } from './inline.ts';
 import { revealedLines } from './reveal.ts';
 import { stateOf, summarize } from './testUtil.ts';
 import { ImageWidget } from './widgets.ts';
+import { imageHeights, imageMeasured } from './hooks.ts';
+import { EditorState } from '@codemirror/state';
 
 function blocks(marked: string): string[] {
   const state = stateOf(marked);
@@ -147,5 +149,44 @@ describe('blocksFor cache (review #3)', () => {
     const reveal = revealedLines(state);
     const heights = new Map<string, number>();
     assert.equal(blocksFor(state, reveal, heights), blocksFor(state, reveal, heights));
+  });
+});
+
+describe('minor fixes', () => {
+  function imageWidget(marked: string): ImageWidget | undefined {
+    const state = stateOf(marked);
+    let found: ImageWidget | undefined;
+    buildBlocks(state, revealedLines(state)).between(0, state.doc.length, (_f, _t, v) => {
+      const w = (v.spec as { widget?: unknown }).widget;
+      if (w instanceof ImageWidget) found = w;
+    });
+    return found;
+  }
+
+  it('an image being edited (cursor on its line) defers loading', () => {
+    assert.equal(imageWidget('![a](p.pn‸g)')?.deferred, true);
+    assert.equal(imageWidget('![a](p.png)\n‸')?.deferred, false);
+  });
+
+  it('deferral alone does not make a different widget (no reload on leaving the line)', () => {
+    assert.ok(new ImageWidget('p.png', 'a', null, true).eq(new ImageWidget('p.png', 'a', null, false)));
+  });
+
+  it('a badge (image inside a link) gets no block widget', () => {
+    assert.deepEqual(blocks('[![b](b.svg)](https://x.io)\n‸'), []);
+  });
+
+  it('a fence inside a blockquote hides the "> " on its code lines', () => {
+    assert.ok(blocks('> ```js\n> let a\n> ```\n\n‸').includes('hide 8-10'));
+  });
+});
+
+describe('imageHeights', () => {
+  it('keeps at most 200 entries', () => {
+    let s = EditorState.create({ extensions: [imageHeights] });
+    for (let i = 0; i < 250; i++) s = s.update({ effects: imageMeasured.of({ src: `p${i}.png`, height: 10 }) }).state;
+    assert.equal(s.field(imageHeights).size, 200);
+    assert.ok(s.field(imageHeights).has('p249.png'));
+    assert.ok(!s.field(imageHeights).has('p0.png'));
   });
 });

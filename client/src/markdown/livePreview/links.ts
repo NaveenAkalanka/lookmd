@@ -72,10 +72,19 @@ export function linkAt(state: EditorState, pos: number): string | null {
       if (n.name === 'URL' && !['Link', 'Autolink', 'Image'].includes(n.parent?.name ?? '')) {
         return state.sliceDoc(n.from, n.to);
       }
-      if (n.name === 'Image' || CODE_LIKE.has(n.name)) break;
+      // An image inside a link (badge) belongs to that link: keep walking up.
+      if (CODE_LIKE.has(n.name)) break;
     }
   }
   return null;
+}
+
+/**
+ * The modifier that opens a link on click: Cmd on macOS (where Ctrl-click is a
+ * right-click and opens the context menu), Ctrl (or Meta) elsewhere.
+ */
+export function isLinkClick(e: { ctrlKey: boolean; metaKey: boolean }, mac: boolean): boolean {
+  return mac ? e.metaKey : e.ctrlKey || e.metaKey;
 }
 
 /** Flip the task box `[ ]` ↔ `[x]` starting at `markerFrom`: a one-character change. */

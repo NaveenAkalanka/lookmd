@@ -98,7 +98,16 @@ export function buildBlocks(
         const code = text ? doc.sliceString(text.from, text.to) : '';
         out.push(CODE_START.range(first.from));
         out.push(Decoration.replace({ widget: new CodeHeadWidget(lang, code) }).range(first.from, first.to));
-        for (let n = first.number + 1; n < last.number; n++) out.push(CODE_LINE.range(doc.line(n).from));
+        // Inside a blockquote, the code lines keep their "> " prefix in the
+        // text; hide it so the code reads clean (the fence lines are replaced).
+        let inQuote = false;
+        for (let p = ref.node.parent; p; p = p.parent) if (p.name === 'Blockquote') inQuote = true;
+        for (let n = first.number + 1; n < last.number; n++) {
+          const line = doc.line(n);
+          out.push(CODE_LINE.range(line.from));
+          const prefix = inQuote ? /^\s*(?:>\s?)+/.exec(line.text) : null;
+          if (prefix && prefix[0].length) out.push(HIDE.range(line.from, line.from + prefix[0].length));
+        }
         out.push(CODE_END.range(last.from));
         if (last.to > last.from) out.push(HIDE.range(last.from, last.to));
         return false;
@@ -116,10 +125,16 @@ export function buildBlocks(
       }
 
       if (ref.name === 'Image') {
+        // Badges (images inside links) render inline (inline.ts).
+        if (ref.node.parent?.name === 'Link') return false;
         const parts = imageParts(state, ref.from, ref.to, ref.node.getChild('URL'), ref.node.getChildren('LinkMark'));
         if (parts.src) {
           const lineEnd = state.doc.lineAt(ref.to).to;
-          out.push(Decoration.widget({ widget: new ImageWidget(parts.src, parts.alt, heights.get(parts.src) ?? null), block: true, side: side++ }).range(lineEnd));
+          // On the cursor line the src may be mid-edit: defer loading so each
+          // keystroke doesn't fetch a partial path.
+          const deferred = touchesReveal(state, reveal, ref.from, ref.to);
+          const widget = new ImageWidget(parts.src, parts.alt, heights.get(parts.src) ?? null, deferred);
+          out.push(Decoration.widget({ widget, block: true, side: side++ }).range(lineEnd));
         }
         return false;
       }

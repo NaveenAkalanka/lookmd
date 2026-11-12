@@ -3,7 +3,7 @@
  * raw only on the lines the cursor touches (see reveal.ts).
  *
  * The decorations themselves come from pure builders (inline.ts); this file is
- * the glue: when to rebuild, the atomic ranges, and the host hooks (images,
+ * the glue: when to rebuild, mouse/link handling, and the host hooks (images,
  * links) the widgets and click handlers call into.
  */
 
@@ -12,7 +12,7 @@ import { Decoration, EditorView, ViewPlugin, showTooltip, type DecorationSet, ty
 import { syntaxTree } from '@codemirror/language';
 import { buildInline } from './inline.ts';
 import { revealField } from './reveal.ts';
-import { linkAt } from './links.ts';
+import { isLinkClick, linkAt } from './links.ts';
 import { blocksFor } from './blocks.ts';
 import { imageHeights, liveHooks } from './hooks.ts';
 
@@ -33,19 +33,10 @@ const blockDecorations = EditorView.decorations.compute(['doc', revealField, par
   blocksFor(state, state.field(revealField), state.field(imageHeights)),
 );
 
-/** The revealed lines, plus the line an IME composition is active on. */
-function currentReveal(view: EditorView): Set<number> {
-  const lines = view.state.field(revealField);
-  if (!view.composing) return lines;
-  const withComposing = new Set(lines);
-  withComposing.add(view.state.doc.lineAt(view.state.selection.main.head).number);
-  return withComposing;
-}
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 class InlinePlugin {
   decorations: DecorationSet = Decoration.none;
-  atomic: DecorationSet = Decoration.none;
-  private composing = false;
 
   constructor(view: EditorView) {
     this.build(view);
@@ -56,7 +47,6 @@ class InlinePlugin {
       u.docChanged ||
       u.viewportChanged ||
       u.startState.field(revealField) !== u.state.field(revealField) ||
-      u.view.composing !== this.composing ||
       syntaxTree(u.startState) !== syntaxTree(u.state)
     ) {
       this.build(u.view);
@@ -64,17 +54,12 @@ class InlinePlugin {
   }
 
   private build(view: EditorView) {
-    this.composing = view.composing;
-    const reveal = currentReveal(view);
-    const built = buildInline(view.state, reveal, view.visibleRanges);
-    this.decorations = built.decorations;
-    this.atomic = built.atomic;
+    this.decorations = buildInline(view.state, view.state.field(revealField), view.visibleRanges).decorations;
   }
 }
 
 const inlinePlugin = ViewPlugin.fromClass(InlinePlugin, {
   decorations: (p) => p.decorations,
-  provide: (p) => EditorView.atomicRanges.of((view) => view.plugin(p)?.atomic ?? Decoration.none),
 });
 
 /**
@@ -83,25 +68,29 @@ const inlinePlugin = ViewPlugin.fromClass(InlinePlugin, {
  * Clicking a rendered line reveals its raw Markdown on mousedown, which shifts
  * the text under the pointer; CodeMirror's default style would then read the
  * mouseup as a drag from the old position to the shifted one (clicking a
- * heading's start selected its "# "). Drags, multi-clicks and modifier clicks
- * keep the default behaviour.
+ * heading's start selected its "# "). Shift-click is handled the same way;
+ * drags still follow the pointer; multi-clicks and Ctrl/Cmd/Alt clicks keep the
+ * default behaviour.
  */
 const CLICK_SLOP = 4;
 const stableClick = EditorView.mouseSelectionStyle.of((view, down) => {
-  if (down.button !== 0 || down.detail > 1 || down.shiftKey || down.altKey || down.ctrlKey || down.metaKey) {
+  if (down.button !== 0 || down.detail > 1 || down.altKey || down.ctrlKey || down.metaKey) {
     return null;
   }
+  // Positions are taken at mousedown, against the layout the user aimed at.
+  // Shift-click extends from the current anchor to that position.
   const start = view.posAtCoords({ x: down.clientX, y: down.clientY }, false);
-  let anchor = start;
+  let head = start;
+  let anchor = down.shiftKey ? view.state.selection.main.anchor : start;
   return {
     update(u) {
       anchor = u.changes.mapPos(anchor);
+      head = u.changes.mapPos(head);
     },
     get(cur) {
       const still = Math.abs(cur.clientX - down.clientX) <= CLICK_SLOP && Math.abs(cur.clientY - down.clientY) <= CLICK_SLOP;
-      if (still) return EditorSelection.single(anchor);
-      const head = view.posAtCoords({ x: cur.clientX, y: cur.clientY }, false);
-      return EditorSelection.single(anchor, head);
+      if (still) return EditorSelection.single(anchor, head);
+      return EditorSelection.single(anchor, view.posAtCoords({ x: cur.clientX, y: cur.clientY }, false));
     },
   };
 });
@@ -112,7 +101,7 @@ const stableClick = EditorView.mouseSelectionStyle.of((view, down) => {
  */
 const linkClicks = EditorView.domEventHandlers({
   mousedown(e, view) {
-    if (e.button !== 0 || !(e.ctrlKey || e.metaKey)) return false;
+    if (e.button !== 0 || !isLinkClick(e, IS_MAC)) return false;
     const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
     if (pos == null) return false;
     const href = linkAt(view.state, pos);

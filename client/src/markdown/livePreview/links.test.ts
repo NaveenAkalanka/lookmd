@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { isExternalUrl, linkAt, toggleTaskAt } from './links.ts';
+import { isExternalUrl, isLinkClick, linkAt, toggleTaskAt } from './links.ts';
 import { parseWikiLink } from '../remarkWikiLink.ts';
 import { stateOf } from './testUtil.ts';
 
@@ -57,5 +57,23 @@ describe('isExternalUrl / parseWikiLink', () => {
     assert.deepEqual(parseWikiLink('Note|al'), { url: 'Note.md', label: 'al' });
     assert.deepEqual(parseWikiLink('img.png'), { url: 'img.png', label: 'img.png' });
     assert.deepEqual(parseWikiLink(' a/b '), { url: 'a/b.md', label: 'a/b' });
+  });
+});
+
+describe('isLinkClick', () => {
+  it('uses Cmd on macOS (Ctrl-click there is a right-click)', () => {
+    assert.equal(isLinkClick({ ctrlKey: true, metaKey: false }, true), false);
+    assert.equal(isLinkClick({ ctrlKey: false, metaKey: true }, true), true);
+  });
+
+  it('uses Ctrl (or Meta) elsewhere', () => {
+    assert.equal(isLinkClick({ ctrlKey: true, metaKey: false }, false), true);
+    assert.equal(isLinkClick({ ctrlKey: false, metaKey: false }, false), false);
+  });
+});
+
+describe('linkAt on a badge', () => {
+  it('finds the link around an image', () => {
+    assert.equal(linkAt(stateOf('[![b](b.svg)](https://x.io)'), 1), 'https://x.io');
   });
 });

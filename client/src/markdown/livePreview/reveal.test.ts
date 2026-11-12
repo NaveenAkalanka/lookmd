@@ -14,9 +14,6 @@ describe('revealedLines', () => {
     assert.deepEqual([...revealedLines(stateOf('«a\nb\nc»'))].sort(), [1, 2, 3]);
   });
 
-  it('includes the composing line', () => {
-    assert.ok(revealedLines(stateOf('‸a\nb'), 2).has(2));
-  });
 });
 
 describe('frontMatterRange', () => {
