@@ -73,3 +73,70 @@ describe('images', () => {
     assert.deepEqual(blocks('`![a](p.png)`\n‸'), []);
   });
 });
+
+describe('fenced code', () => {
+  const CODE = '```js\nlet a = 1\n```\n';
+
+  it('renders: header widget on the opening fence, closing fence hidden, block lines styled', () => {
+    assert.deepEqual(blocks(CODE + '\n‸'), [
+      'line cm-lp-codeblock cm-lp-codeblock-start L1',
+      'widget codehead 0-5',
+      'line cm-lp-codeblock L2',
+      'line cm-lp-codeblock cm-lp-codeblock-end L3',
+      'hide 16-19',
+    ]);
+  });
+
+  it('is raw as a whole when the cursor is anywhere inside', () => {
+    assert.deepEqual(blocks('```js\nlet ‸a = 1\n```\n'), []);
+  });
+
+  it('unclosed fence stays raw', () => {
+    assert.deepEqual(blocks('```js\nlet a\n‸'), []);
+  });
+
+  it('the header carries the language and the code', () => {
+    const state = stateOf(CODE + '\n‸');
+    let found: { lang?: string; code?: string } | undefined;
+    buildBlocks(state, revealedLines(state)).between(0, state.doc.length, (_f, _t, v) => {
+      const w = (v.spec as { widget?: { kind?: string; lang?: string; code?: string } }).widget;
+      if (w?.kind === 'codehead') found = w;
+    });
+    assert.equal(found?.lang, 'js');
+    assert.equal(found?.code, 'let a = 1');
+  });
+});
+
+describe('tables', () => {
+  const TABLE = '| a | b |\n|---|---|\n| 1 | 2 |\n';
+
+  it('render as one block widget over all their lines', () => {
+    assert.deepEqual(blocks(TABLE + '\n‸'), ['widget table 0-29']);
+  });
+
+  it('are raw as a whole when the cursor is in any row', () => {
+    assert.deepEqual(blocks('| a | b |\n|---|---|\n| 1 | ‸2 |\n'), []);
+  });
+
+  it('a revealed table is raw in every row (no inline styling inside)', () => {
+    assert.deepEqual(inline('| a | **b** |\n|---|---|\n| 1 | ‸2 |\n'), []);
+  });
+
+  it('a rendered table leaves its cells to the widget', () => {
+    assert.deepEqual(inline('| a | **b** |\n|---|---|\n| 1 | 2 |\n\n‸'), []);
+  });
+
+  it('unclosed table (header only) stays raw', () => {
+    assert.deepEqual(blocks('| a | b |\n\n‸'), []);
+  });
+});
+
+describe('front matter', () => {
+  it('is dimmed line by line, nothing hidden', () => {
+    assert.deepEqual(blocks('---\nt: x\n---\n# H\n‸'), [
+      'line cm-lp-fm L1',
+      'line cm-lp-fm L2',
+      'line cm-lp-fm L3',
+    ]);
+  });
+});

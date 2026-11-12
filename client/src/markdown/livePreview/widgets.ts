@@ -7,6 +7,7 @@
 import { WidgetType, type EditorView } from '@codemirror/view';
 import { toggleTaskAt } from './links.ts';
 import { imageMeasured, liveHooks } from './hooks.ts';
+import type { Cell, Span, SpanMark, TableModel } from './table.ts';
 
 export class BulletWidget extends WidgetType {
   readonly kind = 'bullet';
@@ -128,5 +129,123 @@ export class ImageWidget extends WidgetType {
   }
   override get estimatedHeight(): number {
     return this.height ?? 120;
+  }
+}
+
+/** A fenced block's header: language badge + copy button (like Read's CodeBlock). */
+export class CodeHeadWidget extends WidgetType {
+  readonly kind = 'codehead';
+  readonly lang: string;
+  readonly code: string;
+  constructor(lang: string, code: string) {
+    super();
+    this.lang = lang;
+    this.code = code;
+  }
+  override eq(other: WidgetType): boolean {
+    return other instanceof CodeHeadWidget && other.lang === this.lang && other.code === this.code;
+  }
+  toDOM(): HTMLElement {
+    const head = document.createElement('span');
+    head.className = 'cm-lp-codehead';
+    const lang = document.createElement('span');
+    lang.className = 'cm-lp-code-lang';
+    lang.textContent = this.lang || 'text';
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'cm-lp-code-copy';
+    copy.textContent = 'Copy';
+    copy.setAttribute('aria-label', 'Copy code');
+    copy.addEventListener('mousedown', (e) => e.preventDefault());
+    copy.addEventListener('click', () => {
+      void navigator.clipboard?.writeText(this.code).then(() => {
+        copy.textContent = 'Copied';
+        window.setTimeout(() => (copy.textContent = 'Copy'), 1200);
+      });
+    });
+    head.append(lang, copy);
+    return head;
+  }
+  /** The copy button handles its own events; a click elsewhere edits the block. */
+  override ignoreEvent(e: Event): boolean {
+    return e.target instanceof Element && !!e.target.closest('.cm-lp-code-copy');
+  }
+}
+
+const MARK_TAGS: Record<SpanMark, string> = { strong: 'strong', em: 'em', code: 'code', strike: 's', link: 'span' };
+
+function renderSpans(parent: HTMLElement, spans: Span[]) {
+  for (const span of spans) {
+    let node: Node = document.createTextNode(span.text);
+    for (const mark of span.marks) {
+      const el = document.createElement(MARK_TAGS[mark]);
+      if (mark === 'link') el.className = 'cm-lp-link';
+      el.appendChild(node);
+      node = el;
+    }
+    parent.appendChild(node);
+  }
+}
+
+/**
+ * A rendered GFM table standing in for its lines. Clicking a cell moves the
+ * cursor into that cell's raw text (which reveals the table for editing).
+ */
+export class TableWidget extends WidgetType {
+  readonly kind = 'table';
+  readonly model: TableModel;
+  /** The table's source text: equal source = same widget. */
+  readonly source: string;
+  /** Start of the replaced range; cell offsets are kept relative to it. */
+  readonly rangeFrom: number;
+  constructor(model: TableModel, source: string, rangeFrom: number) {
+    super();
+    this.model = model;
+    this.source = source;
+    this.rangeFrom = rangeFrom;
+  }
+  override eq(other: WidgetType): boolean {
+    return other instanceof TableWidget && other.source === this.source;
+  }
+  toDOM(view: EditorView): HTMLElement {
+    const wrap = document.createElement('div');
+    wrap.className = 'cm-lp-table-wrap';
+    const table = document.createElement('table');
+    table.className = 'cm-lp-table';
+    const cols = Math.max(this.model.head.length, ...this.model.rows.map((r) => r.length));
+    const addRow = (parent: HTMLElement, cells: Cell[], tag: 'th' | 'td') => {
+      const tr = document.createElement('tr');
+      for (let i = 0; i < cols; i++) {
+        const cell = cells[i];
+        const el = document.createElement(tag);
+        const align = this.model.align[i];
+        if (align) el.style.textAlign = align;
+        if (cell) {
+          el.dataset.at = String(cell.from - this.rangeFrom);
+          renderSpans(el, cell.spans);
+        }
+        tr.appendChild(el);
+      }
+      parent.appendChild(tr);
+    };
+    const thead = document.createElement('thead');
+    addRow(thead, this.model.head, 'th');
+    const tbody = document.createElement('tbody');
+    for (const row of this.model.rows) addRow(tbody, row, 'td');
+    table.append(thead, tbody);
+    wrap.appendChild(table);
+    wrap.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      const cell = (e.target as Element).closest('[data-at]') as HTMLElement | null;
+      const rel = cell ? Number(cell.dataset.at) : 0;
+      const anchor = Math.min(view.state.doc.length, view.posAtDOM(wrap) + rel);
+      view.dispatch({ selection: { anchor }, scrollIntoView: true });
+      view.focus();
+    });
+    return wrap;
+  }
+  override ignoreEvent(): boolean {
+    return true;
   }
 }

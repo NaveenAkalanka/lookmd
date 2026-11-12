@@ -120,6 +120,9 @@ export function buildInline(
         const name = ref.name;
         if (name === 'Document') return;
         if (fm && ref.from < fm.to) return false;
+        // Whole-block constructs (blocks.ts): rendered by their widget, or raw
+        // as a whole while revealed — never partly styled.
+        if (name === 'Table' || name === 'FencedCode') return false;
         const key = `${name}:${ref.from}:${ref.to}`;
         if (seen.has(key)) return false;
         seen.add(key);

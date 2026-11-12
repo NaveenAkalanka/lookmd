@@ -90,4 +90,93 @@ export const liveTheme = EditorView.theme({
     borderRadius: '4px',
     padding: '0.1em 0.35em',
   },
+
+  // Fenced code: one panel across its lines, like Read's code block. The
+  // opening fence line holds the header widget; the closing fence is hidden.
+  '.cm-line.cm-lp-codeblock': {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.88em',
+    lineHeight: '1.55',
+    backgroundColor: 'var(--background)',
+    borderLeft: '1px solid var(--border)',
+    borderRight: '1px solid var(--border)',
+    padding: '0 16px',
+  },
+  '.cm-line.cm-lp-codeblock-start': {
+    borderTop: '1px solid var(--border)',
+    borderTopLeftRadius: '8px',
+    borderTopRightRadius: '8px',
+    padding: '0',
+    backgroundColor: 'color-mix(in srgb, var(--surface) 60%, var(--background))',
+    borderBottom: '1px solid var(--border)',
+  },
+  '.cm-line.cm-lp-codeblock-end': {
+    borderBottom: '1px solid var(--border)',
+    borderBottomLeftRadius: '8px',
+    borderBottomRightRadius: '8px',
+  },
+  // inline-flex (not flex): a block box here pushes CodeMirror's cursor
+  // helpers onto their own rows and makes the header three lines tall.
+  '.cm-lp-codehead': {
+    display: 'inline-flex',
+    width: '100%',
+    boxSizing: 'border-box',
+    verticalAlign: 'middle',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '4px 8px 4px 12px',
+  },
+  '.cm-lp-code-lang': {
+    fontFamily: 'var(--font-ui)',
+    fontSize: '11px',
+    fontWeight: '600',
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+    color: 'var(--text-tertiary)',
+  },
+  '.cm-lp-code-copy': {
+    fontFamily: 'var(--font-ui)',
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    backgroundColor: 'transparent',
+    border: '1px solid transparent',
+    borderRadius: '5px',
+    padding: '2px 7px',
+    cursor: 'pointer',
+  },
+  '.cm-lp-code-copy:hover': {
+    color: 'var(--text-primary)',
+    borderColor: 'var(--border)',
+  },
+
+  // Tables: the Read view's grid.
+  '.cm-lp-table-wrap': {
+    overflowX: 'auto',
+    padding: '0.3em 0',
+  },
+  '.cm-lp-table': {
+    borderCollapse: 'collapse',
+    cursor: 'text',
+  },
+  '.cm-lp-table th, .cm-lp-table td': {
+    border: '1px solid var(--border)',
+    padding: '6px 10px',
+    verticalAlign: 'top',
+  },
+  '.cm-lp-table th': { fontWeight: '600' },
+  '.cm-lp-table code': {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.88em',
+    backgroundColor: 'var(--background)',
+    border: '1px solid var(--border)',
+    borderRadius: '4px',
+    padding: '0.1em 0.35em',
+  },
+
+  // Front matter: raw, dimmed mono.
+  '.cm-line.cm-lp-fm': {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.85em',
+    color: 'var(--text-tertiary)',
+  },
 });

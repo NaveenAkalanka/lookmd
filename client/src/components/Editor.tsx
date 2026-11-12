@@ -24,6 +24,7 @@ import { basicSetup } from 'codemirror';
 import { EditorView, keymap } from '@codemirror/view';
 import { Annotation, Compartment, EditorState, Prec, type Extension } from '@codemirror/state';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import { languages } from '@codemirror/language-data';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { undo, redo } from '@codemirror/commands';
 import { openSearchPanel } from '@codemirror/search';
@@ -345,7 +346,8 @@ export function Editor({
         extensions: [
           saveKeymap,
           basicSetup,
-          markdown({ base: markdownLanguage }),
+          // GFM, plus syntax highlighting inside fenced code (languages load lazily).
+          markdown({ base: markdownLanguage, codeLanguages: languages }),
           themeFromTokens,
           variantSlot.current!.of(variantExtensions(variantRef.current)),
           liveHooks.of({
