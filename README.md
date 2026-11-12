@@ -36,7 +36,9 @@ all rendering happens in the browser. Your `.md` files are touched only when
 ### Reading & editing
 - **Three views + an Edit toggle** — **Read** (rendered), **Source** (raw) and
   **Split** (raw | rendered side by side). **Edit** (`Ctrl/Cmd-E`) makes the
-  *current* view editable instead of being a view of its own.
+  *current* view editable instead of being a view of its own. **Cancel** stops
+  editing; with unsaved changes it asks first, then restores the file as it is
+  on disk. The top bar's **⋯** menu holds undo, clipboard and find/replace.
 - **Live preview** — Read with Edit on is an Obsidian-style editor: you type
   in the rendered page, and the raw Markdown appears only on the lines your
   cursor touches. Headings, emphasis, links and `[[wiki-links]]`, lists and

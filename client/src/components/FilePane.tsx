@@ -58,6 +58,8 @@ interface Props {
   /** Edit toggle: makes the current view editable. */
   editing: boolean;
   onEditing: (on: boolean) => void;
+  /** Stop editing, discarding unsaved changes (after a confirm). */
+  onCancelEdit: () => void;
   /** Whether this file can be saved at all (false in a read-only build). */
   canWrite: boolean;
   lineNumbers: boolean;
@@ -101,6 +103,7 @@ export function FilePane({
   onMode,
   editing,
   onEditing,
+  onCancelEdit,
   canWrite,
   lineNumbers,
   zoom,
@@ -327,6 +330,16 @@ export function FilePane({
             onClick={toggleAnnotate}
           >
             <Icon icon={HighlighterIcon} size={15} />
+          </button>
+        )}
+        {editOn && (
+          <button
+            className="btn edit-cancel"
+            title={dirty ? 'Discard changes and stop editing' : 'Stop editing'}
+            onClick={onCancelEdit}
+            disabled={tab.saving}
+          >
+            Cancel
           </button>
         )}
         {canWrite && (

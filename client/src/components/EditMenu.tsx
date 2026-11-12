@@ -1,5 +1,5 @@
 /**
- * Topbar "Edit" menu: a VS Code-style dropdown exposing the editor commands
+ * Topbar edit menu (a ⋯ button): a VS Code-style dropdown exposing the editor commands
  * (undo/redo, clipboard, find/replace) plus workspace-wide Find/Replace in
  * Files. The editor commands act on the currently focused editor (`editApi`);
  * they're disabled when no editor is focused. Closes on selection, outside
@@ -8,6 +8,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { EditorApi } from '../editorApi';
+import { MoreHorizontalIcon } from '@hugeicons/core-free-icons';
+import { Icon } from './Icon';
 
 interface Props {
   editApi: EditorApi | null;
@@ -67,13 +69,16 @@ export function EditMenu({ editApi, onFindInFiles, onReplaceInFiles }: Props) {
 
   return (
     <div className="menu" ref={wrapRef}>
+      {/* An icon, not the word "Edit": the pane's Edit toggle owns that word. */}
       <button
-        className={`btn menu-trigger${open ? ' menu-trigger-open' : ''}`}
+        className={`btn icon-btn menu-trigger${open ? ' menu-trigger-open' : ''}`}
+        title="Edit menu: undo, clipboard, find"
+        aria-label="Edit menu"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        Edit
+        <Icon icon={MoreHorizontalIcon} />
       </button>
       {open && (
         <div className="menu-pop" role="menu">

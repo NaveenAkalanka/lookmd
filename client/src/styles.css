@@ -2707,6 +2707,10 @@ body.resizing-col .sidebar {
 .menu-trigger {
   padding: 4px 12px;
 }
+/* The Edit menu's trigger is an icon (⋯): size it like the other icon buttons. */
+.menu-trigger.icon-btn {
+  padding: 5px 9px;
+}
 .menu-trigger-open {
   border-color: var(--accent);
 }

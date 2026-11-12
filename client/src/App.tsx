@@ -893,6 +893,20 @@ export function App() {
     [updateTab],
   );
 
+  // Cancel editing a pane: with unsaved changes, confirm, then put the text back
+  // to what's on disk; either way turn Edit off. Turning Edit off unmounts the
+  // editor, so the next Edit starts fresh from the restored text.
+  const cancelEdit = useCallback(
+    (tab: Tab | null, stop: (on: boolean) => void) => {
+      if (tab && tabDirty(tab)) {
+        if (!window.confirm('Discard your changes to this file and stop editing?')) return;
+        updateTab(tab.path, { draft: tab.content ?? '' });
+      }
+      stop(false);
+    },
+    [updateTab],
+  );
+
   // --- Tree actions (create / rename / delete) ---------------------------
   // The backend only operates on text files (and refuses to move/delete dirs),
   // so the UI matches: new-file lives on folders, rename/delete on files.
@@ -1448,6 +1462,7 @@ export function App() {
                 onMode={setMode}
                 editing={editing}
                 onEditing={setEditing}
+                onCancelEdit={() => cancelEdit(activeTab, setEditing)}
                 canWrite={canWrite}
                 lineNumbers={lineNumbers}
                 zoom={zoomMap.primary}
@@ -1512,6 +1527,7 @@ export function App() {
                   onMode={setSecondaryMode}
                   editing={secondaryEditing}
                   onEditing={setSecondaryEditing}
+                  onCancelEdit={() => cancelEdit(secondaryTab, setSecondaryEditing)}
                   canWrite={canWrite}
                   lineNumbers={lineNumbers}
                   zoom={zoomMap.secondary}
