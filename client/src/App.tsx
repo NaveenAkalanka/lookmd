@@ -1156,15 +1156,23 @@ export function App() {
     [closeTab, closeOthers, closeAll, openToSide, copyText, tabs.length, showMenu],
   );
 
-  // Jump to a heading from the outline: ensure Read mode, then scroll to its id
-  // (rehype-slug puts matching ids on the rendered headings).
-  const jumpToHeading = useCallback((slug: string) => {
-    setMode('read');
-    setDrawerOpen(false); // on mobile, get the drawer out of the way
-    window.setTimeout(() => {
-      document.getElementById(slug)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 60);
-  }, []);
+  // Jump to a heading from the outline, in Read. While editing, Read is the live
+  // editor, so move its cursor to the heading's line; otherwise scroll the
+  // rendered page to the heading's id (rehype-slug puts matching ids on it).
+  const jumpToHeading = useCallback(
+    (slug: string, line: number) => {
+      setMode('read');
+      setDrawerOpen(false); // on mobile, get the drawer out of the way
+      if (editing && canWrite) {
+        setReveal((r) => ({ line, nonce: (r?.nonce ?? 0) + 1 }));
+        return;
+      }
+      window.setTimeout(() => {
+        document.getElementById(slug)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 60);
+    },
+    [editing, canWrite],
+  );
 
   const settingsButton = (
     <button

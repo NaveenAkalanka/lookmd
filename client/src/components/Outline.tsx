@@ -1,41 +1,16 @@
 /**
  * Outline panel: the active file's headings, indented by level. Clicking one
- * jumps to that heading in the Read view. Slugs are generated with the same
- * github-slugger algorithm rehype-slug uses, so the ids line up.
+ * jumps to that heading — by slug in the Read page (ids from rehype-slug, same
+ * github-slugger algorithm) or by line in the live editor.
  */
 
 import { useMemo } from 'react';
-import GithubSlugger from 'github-slugger';
-
-interface Heading {
-  level: number;
-  text: string;
-  slug: string;
-}
-
-function extractHeadings(md: string): Heading[] {
-  const slugger = new GithubSlugger();
-  const out: Heading[] = [];
-  let inFence = false;
-  for (const line of md.split(/\r?\n/)) {
-    if (/^\s*(```|~~~)/.test(line)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-    const m = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
-    if (!m) continue;
-    const text = (m[2] ?? '').replace(/[`*_]/g, '').trim();
-    if (!text) continue;
-    out.push({ level: (m[1] ?? '').length, text, slug: slugger.slug(text) });
-  }
-  return out;
-}
+import { extractHeadings } from '../markdown/headings';
 
 interface Props {
   /** The active file's text, or null when no file (or a non-Markdown file) is open. */
   content: string | null;
-  onJump: (slug: string) => void;
+  onJump: (slug: string, line: number) => void;
 }
 
 export function Outline({ content, onJump }: Props) {
@@ -57,7 +32,7 @@ export function Outline({ content, onJump }: Props) {
               className="outline-item"
               style={{ paddingInlineStart: `${10 + (h.level - minLevel) * 12}px` }}
               title={h.text}
-              onClick={() => onJump(h.slug)}
+              onClick={() => onJump(h.slug, h.line)}
             >
               {h.text}
             </button>

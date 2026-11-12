@@ -252,12 +252,13 @@ export function FilePane({
     const find = () => {
       const view = viewRef.current;
       if (!view) return;
-      const host: HTMLElement | null =
-        shown !== 'source'
+      // The editor (any view with Edit on, live preview included) scrolls in
+      // .cm-scroller; the Read page scrolls the view; read-only Source its wrap.
+      const host: HTMLElement | null = editorShown
+        ? view.querySelector('.cm-scroller')
+        : shown !== 'source'
           ? view
-          : editorShown
-            ? view.querySelector('.cm-scroller')
-            : (view.querySelector('.source-wrap') ?? view.querySelector('.split-scroll'));
+          : (view.querySelector('.source-wrap') ?? view.querySelector('.split-scroll'));
       if (host) setScrollHost(host);
       else if (tries++ < 60) raf = requestAnimationFrame(find);
     };

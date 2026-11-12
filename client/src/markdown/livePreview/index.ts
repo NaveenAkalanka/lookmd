@@ -8,7 +8,7 @@
  */
 
 import { EditorSelection, StateField, type Extension } from '@codemirror/state';
-import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+import { Decoration, EditorView, ViewPlugin, showTooltip, type DecorationSet, type Tooltip, type ViewUpdate } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { buildInline } from './inline.ts';
 import { revealField } from './reveal.ts';
@@ -123,9 +123,36 @@ const linkClicks = EditorView.domEventHandlers({
   },
 });
 
+/**
+ * Touch has no Ctrl/Cmd-click: on coarse pointers, a cursor inside a link
+ * shows a small "Open link" chip above it.
+ */
+const linkChip = showTooltip.compute(['selection', 'doc'], (state): Tooltip | null => {
+  const hooks = state.facet(liveHooks);
+  const sel = state.selection.main;
+  if (!sel.empty || !hooks.coarsePointer()) return null;
+  const href = linkAt(state, sel.head);
+  if (!href) return null;
+  return {
+    pos: sel.head,
+    above: true,
+    create: () => {
+      const dom = document.createElement('button');
+      dom.type = 'button';
+      dom.className = 'cm-lp-link-chip';
+      dom.textContent = 'Open link';
+      dom.title = href;
+      // Keep the editor's focus (and the keyboard up) while tapping the chip.
+      dom.addEventListener('mousedown', (e) => e.preventDefault());
+      dom.addEventListener('click', () => hooks.openLink(href));
+      return { dom };
+    },
+  };
+});
+
 /** The live-preview behaviour (pair it with `liveTheme`). */
 export function livePreview(): Extension {
-  return [revealField, parseTick, imageHeights, blockDecorations, stableClick, linkClicks, inlinePlugin];
+  return [revealField, parseTick, imageHeights, blockDecorations, stableClick, linkClicks, linkChip, inlinePlugin];
 }
 
 export { liveTheme } from './theme.ts';

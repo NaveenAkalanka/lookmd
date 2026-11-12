@@ -173,6 +173,23 @@ export const liveTheme = EditorView.theme({
     padding: '0.1em 0.35em',
   },
 
+  // Touch: the "Open link" chip above a cursor inside a link.
+  '.cm-tooltip:has(> .cm-lp-link-chip)': {
+    border: 'none',
+    backgroundColor: 'transparent',
+  },
+  '.cm-lp-link-chip': {
+    fontFamily: 'var(--font-ui)',
+    fontSize: '13px',
+    color: 'var(--text-primary)',
+    backgroundColor: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: '999px',
+    padding: '6px 14px',
+    minHeight: '34px',
+    cursor: 'pointer',
+  },
+
   // Front matter: raw, dimmed mono.
   '.cm-line.cm-lp-fm': {
     fontFamily: 'var(--font-mono)',
